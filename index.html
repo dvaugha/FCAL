@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Calendar & Tasks</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .login-container h1 { margin-bottom: 30px; color: #333; text-align: center; }
+        .login-container input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .error-message { color: #e74c3c; text-align: center; margin-bottom: 15px; font-size: 14px; }
+        .main-container { display: none; max-width: 1400px; margin: 0 auto; }
+        .calendar-container, .tasks-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        .header, .tasks-header {
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .tasks-header { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); }
+        .header-buttons { display: flex; gap: 10px; }
+        .header-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .controls {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .month-nav { display: flex; align-items: center; gap: 20px; }
+        .month-nav button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .add-event-btn {
+            padding: 10px 20px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            padding: 20px;
+            gap: 10px;
+        }
+        .day-header { text-align: center; font-weight: bold; padding: 10px; color: #667eea; }
+        .day-cell {
+            min-height: 100px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+        .day-cell:hover { background: #f8f9fa; }
+        .day-cell.other-month { opacity: 0.3; }
+        .day-number { font-weight: bold; margin-bottom: 5px; flex-shrink: 0; }
+        .event-item {
+            font-size: 11px;
+            padding: 3px 6px;
+            margin: 2px 0;
+            border-radius: 3px;
+            color: white;
+            overflow: hidden;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            flex-shrink: 0;
+            line-height: 1.3;
+        }
+        .event-item.repeating::after { content: '🔁'; font-size: 10px; }
+        .tasks-content { padding: 20px 30px; max-height: 500px; overflow-y: auto; }
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .task-checkbox { width: 20px; height: 20px; cursor: pointer; }
+        .task-icon { font-size: 20px; }
+        .task-details { flex: 1; }
+        .task-title { font-weight: 500; }
+        .task-title.completed { text-decoration: line-through; color: #999; }
+        .task-category { font-size: 12px; color: #666; margin-top: 4px; }
+        .task-actions { display: flex; gap: 5px; }
+        .task-actions button { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .repeat-options, .icon-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .icon-selector { grid-template-columns: repeat(8, 1fr); }
+        .repeat-option, .icon-option {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .repeat-option.selected, .icon-option.selected { border-color: #667eea; background: #e8eaf6; }
+        .button-group { display: flex; gap: 10px; margin-top: 20px; }
+        .button-group button { flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer; }
+        .save-btn { background: #27ae60; color: white; }
+        .delete-btn { background: #e74c3c; color: white; }
+        .cancel-btn { background: #95a5a6; color: white; }
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .category-color { width: 40px; height: 40px; border-radius: 50%; }
+        .category-info { flex: 1; }
+        .category-actions { display: flex; gap: 5px; }
+        .edit-category, .remove-category {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: white;
+        }
+        .edit-category { background: #3498db; }
+        .remove-category { background: #e74c3c; }
+        .color-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 10px; }
+        .color-swatch {
+            width: 100%;
+            padding-top: 100%;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+        }
+        .color-swatch.selected { border-color: #333; transform: scale(1.1); }
+    </style>
+</head>
+<body>
+    <script>
+        const ICONS = ['🎉','🎂','💼','📅','✈️','🏥','🎓','💪','🍽️','🎵','📚','💻','🎨','⚽','🏀','🤸','🎮','🎬','📞','✉️','🏠','🚗','🎁','❤️','⭐','🔔','📝','💡','🔧','🛒','☕','🌟','🎯','📊','🧹','🧺','🧼','🧽','🧴','🛁','🧻','🗑️','🔨','🪛','🪚'];
+        const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e91e63','#795548','#ff5722','#00bcd4','#4caf50','#ffc107','#673ab7','#009688','#ff4081','#8d6e63'];
+        const REPEATS = [{v:'none',l:'No Repeat'},{v:'daily',l:'Every Day'},{v:'weekly',l:'Every Week'},{v:'biweekly',l:'Every 2 Weeks'},{v:'monthly',l:'Every Month'},{v:'yearly',l:'Every Year'}];
+        
+        let curDate = new Date(), evs = {}, repEvs = [], tks = [], repTks = [], evCats = {}, tkCats = {};
+        let editEvId = null, editTkId = null, editCatKey = null, curCatType = 'event';
+        let selEvIcon = '', selTkIcon = '', selCatIcon = '', selColor = '', selEditColor = '', selEditIcon = '', selRepeat = 'none', selTkRepeat = 'none';
+
+        function hash(s) {
+            let h = 0;
+            for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h &= h;
+            return h.toString();
+        }
+
+        function doLogin() {
+            const pwd = document.getElementById('passwordInput').value, err = document.getElementById('errorMessage');
+            if (!pwd) { err.textContent = 'Enter a password'; return; }
+            const hashed = hash(pwd), stored = localStorage.getItem('cal_pwd');
+            if (!stored) { localStorage.setItem('cal_pwd', hashed); initApp(); }
+            else if (stored === hashed) initApp();
+            else { err.textContent = 'Incorrect password'; }
+        }
+
+        function doLogout() {
+            document.getElementById('loginContainer').style.display = 'block';
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        function initApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            loadAll();
+            renderCal();
+            renderTasks();
+        }
+
+        function loadAll() {
+            evs = JSON.parse(localStorage.getItem('cal_evs') || '{}');
+            repEvs = JSON.parse(localStorage.getItem('cal_rep_evs') || '[]');
+            tks = JSON.parse(localStorage.getItem('cal_tks') || '[]');
+            repTks = JSON.parse(localStorage.getItem('cal_rep_tks') || '[]');
+            evCats = JSON.parse(localStorage.getItem('cal_ev_cats') || '{"personal":{"name":"Personal","color":"#3498db","icon":"👤"},"work":{"name":"Work","color":"#e74c3c","icon":"💼"}}');
+            tkCats = JSON.parse(localStorage.getItem('cal_tk_cats') || '{"cleaning":{"name":"Cleaning","color":"#3498db","icon":"🧹"},"shopping":{"name":"Shopping","color":"#f39c12","icon":"🛒"}}');
+            updateCatSelects();
+        }
+
+        function saveAll() {
+            localStorage.setItem('cal_evs', JSON.stringify(evs));
+            localStorage.setItem('cal_rep_evs', JSON.stringify(repEvs));
+            localStorage.setItem('cal_tks', JSON.stringify(tks));
+            localStorage.setItem('cal_rep_tks', JSON.stringify(repTks));
+            localStorage.setItem('cal_ev_cats', JSON.stringify(evCats));
+            localStorage.setItem('cal_tk_cats', JSON.stringify(tkCats));
+        }
+
+        function getRepEvs(dateKey) {
+            const d = new Date(dateKey), res = [];
+            repEvs.forEach(ev => {
+                const ed = new Date(ev.startDate);
+                if (d < ed) return;
+                let show = false;
+                if (ev.repeat === 'daily') show = true;
+                else if (ev.repeat === 'weekly') show = d.getDay() === ed.getDay();
+                else if (ev.repeat === 'biweekly') {
+                    const diff = Math.floor((d - ed) / 86400000);
+                    show = d.getDay() === ed.getDay() && diff % 14 === 0;
+                }
+                else if (ev.repeat === 'monthly') show = d.getDate() === ed.getDate();
+                else if (ev.repeat === 'yearly') show = d.getDate() === ed.getDate() && d.getMonth() === ed.getMonth();
+                if (show) res.push({...ev, isRepeating: true});
+            });
+            return res;
+        }
+
+        function getRepTks() {
+            const t = new Date(), tk = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`, res = [];
+            repTks.forEach(task => {
+                if (!task.startDate) return;
+                const td = new Date(task.startDate), today = new Date(tk);
+                if (today < td) return;
+                let show = false;
+                if (task.repeat === 'daily') show = true;
+                else if (task.repeat === 'weekly') show = today.getDay() === td.getDay();
+                else if (task.repeat === 'biweekly') {
+                    const diff = Math.floor((today - td) / 86400000);
+                    show = today.getDay() === td.getDay() && diff % 14 === 0;
+                }
+                else if (task.repeat === 'monthly') show = today.getDate() === td.getDate();
+                else if (task.repeat === 'yearly') show = today.getDate() === td.getDate() && today.getMonth() === td.getMonth();
+                if (show) {
+                    const done = task.completedDates && task.completedDates.includes(tk);
+                    res.push({...task, isRepeating: true, completed: done, currentDate: tk});
+                }
+            });
+            return res;
+        }
+
+        function renderCal() {
+            const y = curDate.getFullYear(), m = curDate.getMonth();
+            document.getElementById('currentMonth').textContent = curDate.toLocaleString('default', {month: 'long', year: 'numeric'});
+            const fd = new Date(y, m, 1), ld = new Date(y, m + 1, 0), pld = new Date(y, m, 0);
+            const start = fd.getDay(), total = ld.getDate(), grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+                const h = document.createElement('div');
+                h.className = 'day-header';
+                h.textContent = d;
+                grid.appendChild(h);
+            });
+            for (let i = start - 1; i >= 0; i--) grid.appendChild(mkCell(pld.getDate() - i, y, m - 1, true));
+            for (let d = 1; d <= total; d++) grid.appendChild(mkCell(d, y, m, false));
+            const rem = 42 - (start + total);
+            for (let d = 1; d <= rem; d++) grid.appendChild(mkCell(d, y, m + 1, true));
+        }
+
+        function mkCell(day, y, m, other) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell' + (other ? ' other-month' : '');
+            const num = document.createElement('div');
+            num.className = 'day-number';
+            num.textContent = day;
+            cell.appendChild(num);
+            const dk = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const all = [...(evs[dk] || []), ...getRepEvs(dk)];
+            all.forEach(ev => {
+                const el = document.createElement('div');
+                el.className = 'event-item' + (ev.isRepeating ? ' repeating' : '');
+                el.style.backgroundColor = evCats[ev.category]?.color || '#999';
+                const ic = ev.icon || evCats[ev.category]?.icon || '';
+                el.textContent = (ic ? ic + ' ' : '') + (ev.time ? ev.time + ' ' : '') + ev.title;
+                el.onclick = e => { e.stopPropagation(); openEvModal(ev.id, dk, ev.isRepeating); };
+                cell.appendChild(el);
+            });
+            if (!other) cell.onclick = () => openEvModal(null, dk);
+            return cell;
+        }
+
+        function prevMonth() { curDate.setMonth(curDate.getMonth() - 1); renderCal(); }
+        function nextMonth() { curDate.setMonth(curDate.getMonth() + 1); renderCal(); }
+
+        function renderIconSel(cid, sel, cb) {
+            const c = document.getElementById(cid);
+            c.innerHTML = '';
+            ICONS.forEach(ic => {
+                const o = document.createElement('div');
+                o.className = 'icon-option' + (ic === sel ? ' selected' : '');
+                o.textContent = ic;
+                o.onclick = () => {
+                    c.querySelectorAll('.icon-option').forEach(e => e.classList.remove('selected'));
+                    o.classList.add('selected');
+                    cb(ic);
+                };
+                c.appendChild(o);
+            });
+        }
+
+        function renderColorGrid(cid, sel, cb) {
+            const c = document.getElementById(cid);
+            c.innerHTML = '';
+            COLORS.forEach(col => {
+                const s = document.createElement('div');
+                s.className = 'color-swatch' + (col === sel ? ' selected' : '');
+                s.style.backgroundColor = col;
+                s.onclick = () => {
+                    c.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('selected'));
+                    s.classList.add('selected');
+                    cb(col);
+                };
+                c.appendChild(s);
+            });
+        }
+
+        function renderRepOpts(cid, sel, cb) {
+            const c = document.getElementById(cid);
+            c.innerHTML = '';
+            REPEATS.forEach(r => {
+                const o = document.createElement('div');
+                o.className = 'repeat-option' + (r.v === sel ? ' selected' : '');
+                o.textContent = r.l;
+                o.onclick = () => {
+                    c.querySelectorAll('.repeat-option').forEach(e => e.classList.remove('selected'));
+                    o.classList.add('selected');
+                    cb(r.v);
+                };
+                c.appendChild(o);
+            });
+        }
+
+        function openEvModal(id = null, dk = null, isRep = false) {
+            editEvId = id;
+            const del = document.getElementById('delEvBtn');
+            if (id) {
+                document.getElementById('evModalTitle').textContent = 'Edit Event';
+                del.style.display = 'block';
+                let ev = null;
+                if (isRep) { ev = repEvs.find(e => e.id === id); if (ev) dk = ev.startDate; }
+                else { for (let d in evs) { ev = evs[d].find(e => e.id === id); if (ev) { dk = d; break; } } }
+                if (ev) {
+                    document.getElementById('evTitle').value = ev.title;
+                    document.getElementById('evDate').value = dk;
+                    document.getElementById('evTime').value = ev.time || '';
+                    document.getElementById('evDesc').value = ev.description || '';
+                    document.getElementById('evCat').value = ev.category;
+                    document.getElementById('evDuration').value = ev.duration || 1;
+                    selEvIcon = ev.icon || '';
+                    selRepeat = ev.repeat || 'none';
+                }
+            } else {
+                document.getElementById('evModalTitle').textContent = 'Add Event';
+                del.style.display = 'none';
+                document.getElementById('evTitle').value = '';
+                document.getElementById('evDate').value = dk || '';
+                document.getElementById('evTime').value = '';
+                document.getElementById('evDesc').value = '';
+                document.getElementById('evCat').value = Object.keys(evCats)[0];
+                document.getElementById('evDuration').value = 1;
+                selEvIcon = '';
+                selRepeat = 'none';
+            }
+            renderIconSel('evIconSel', selEvIcon, ic => selEvIcon = ic);
+            renderRepOpts('evRepeat', selRepeat, r => selRepeat = r);
+            document.getElementById('eventModal').style.display = 'flex';
+        }
+
+        function closeEvModal() {
+            document.getElementById('eventModal').style.display = 'none';
+            editEvId = null;
+            selEvIcon = '';
+            selRepeat = 'none';
+        }
+
+        function saveEv() {
+            const title = document.getElementById('evTitle').value.trim();
+            const date = document.getElementById('evDate').value;
+            const duration = parseInt(document.getElementById('evDuration').value) || 1;
+            if (!title || !date) { alert('Enter title and date'); return; }
+            
+            const eventId = editEvId || Date.now().toString();
+            
+            if (editEvId) {
+                // Delete old event from all days
+                for (let dk in evs) {
+                    evs[dk] = evs[dk].filter(e => e.id !== editEvId);
+                    if (evs[dk].length === 0) delete evs[dk];
+                }
+                const ridx = repEvs.findIndex(e => e.id === editEvId);
+                if (ridx !== -1) repEvs.splice(ridx, 1);
+            }
+            
+            const ev = {
+                id: eventId,
+                title, 
+                time: document.getElementById('evTime').value,
+                description: document.getElementById('evDesc').value.trim(),
+                category: document.getElementById('evCat').value,
+                icon: selEvIcon,
+                repeat: selRepeat,
+                duration: duration
+            };
+            
+            if (selRepeat === 'none') {
+                // Add event to each day in the duration
+                const startDate = new Date(date);
+                for (let i = 0; i < duration; i++) {
+                    const currentDate = new Date(startDate);
+                    currentDate.setDate(startDate.getDate() + i);
+                    const dk = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+                    if (!evs[dk]) evs[dk] = [];
+                    evs[dk].push({...ev});
+                }
+            } else {
+                ev.startDate = date;
+                repEvs.push(ev);
+            }
+            saveAll();
+            renderCal();
+            closeEvModal();
+        }
+
+        function delEv() {
+            console.log('Delete clicked, editEvId:', editEvId);
+            
+            // Delete from all days that have this event ID
+            let deletedCount = 0;
+            for (let dk in evs) {
+                const beforeLength = evs[dk].length;
+                evs[dk] = evs[dk].filter(e => e.id !== editEvId);
+                deletedCount += beforeLength - evs[dk].length;
+                if (evs[dk].length === 0) delete evs[dk];
+            }
+            console.log('Deleted from', deletedCount, 'days');
+            
+            const ridx = repEvs.findIndex(e => e.id === editEvId);
+            if (ridx !== -1) {
+                repEvs.splice(ridx, 1);
+                console.log('Deleted repeating event');
+            }
+            
+            saveAll();
+            renderCal();
+            closeEvModal();
+            console.log('Delete complete');
+        }
+
+        function renderTasks() {
+            const c = document.getElementById('tasksContent');
+            c.innerHTML = '';
+            const all = [...tks, ...getRepTks()];
+            if (all.length === 0) { c.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">No tasks!</p>'; return; }
+            const act = all.filter(t => !t.completed), done = all.filter(t => t.completed);
+            [...act, ...done].forEach(tk => {
+                const el = document.createElement('div');
+                el.className = 'task-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'task-checkbox';
+                cb.checked = tk.completed;
+                cb.onchange = () => toggleTk(tk.id, tk.isRepeating, tk.currentDate);
+                const ic = document.createElement('span');
+                ic.className = 'task-icon';
+                ic.textContent = tk.icon || tkCats[tk.category]?.icon || '📝';
+                const det = document.createElement('div');
+                det.className = 'task-details';
+                const tit = document.createElement('div');
+                tit.className = 'task-title' + (tk.completed ? ' completed' : '');
+                tit.textContent = tk.title + (tk.isRepeating ? ' 🔁' : '');
+                const cat = document.createElement('div');
+                cat.className = 'task-category';
+                cat.textContent = tkCats[tk.category]?.name || 'Other';
+                cat.style.color = tkCats[tk.category]?.color || '#999';
+                det.appendChild(tit);
+                det.appendChild(cat);
+                const acts = document.createElement('div');
+                acts.className = 'task-actions';
+                const edt = document.createElement('button');
+                edt.textContent = 'Edit';
+                edt.style.background = '#3498db';
+                edt.style.color = 'white';
+                edt.onclick = () => openTkModal(tk.id, tk.isRepeating);
+                const del = document.createElement('button');
+                del.textContent = 'Delete';
+                del.style.background = '#e74c3c';
+                del.style.color = 'white';
+                del.onclick = () => delTkDirect(tk.id, tk.isRepeating);
+                acts.appendChild(edt);
+                acts.appendChild(del);
+                el.appendChild(cb);
+                el.appendChild(ic);
+                el.appendChild(det);
+                el.appendChild(acts);
+                c.appendChild(el);
+            });
+        }
+
+        function openTkModal(id = null, isRep = false) {
+            editTkId = id;
+            const del = document.getElementById('delTkBtn');
+            if (id) {
+                document.getElementById('tkModalTitle').textContent = 'Edit Task';
+                del.style.display = 'block';
+                let tk = null;
+                if (isRep) tk = repTks.find(t => t.id === id);
+                else tk = tks.find(t => t.id === id);
+                if (tk) {
+                    document.getElementById('tkTitle').value = tk.title;
+                    document.getElementById('tkDesc').value = tk.description || '';
+                    document.getElementById('tkCat').value = tk.category;
+                    selTkIcon = tk.icon || '';
+                    selTkRepeat = tk.repeat || 'none';
+                }
+            } else {
+                document.getElementById('tkModalTitle').textContent = 'Add Task';
+                del.style.display = 'none';
+                document.getElementById('tkTitle').value = '';
+                document.getElementById('tkDesc').value = '';
+                document.getElementById('tkCat').value = Object.keys(tkCats)[0];
+                selTkIcon = '';
+                selTkRepeat = 'none';
+            }
+            renderIconSel('tkIconSel', selTkIcon, ic => selTkIcon = ic);
+            renderRepOpts('tkRepeat', selTkRepeat, r => selTkRepeat = r);
+            document.getElementById('taskModal').style.display = 'flex';
+        }
+
+        function closeTkModal() {
+            document.getElementById('taskModal').style.display = 'none';
+            editTkId = null;
+            selTkIcon = '';
+            selTkRepeat = 'none';
+        }
+
+        function saveTk() {
+            const title = document.getElementById('tkTitle').value.trim();
+            if (!title) { alert('Enter task title'); return; }
+            if (editTkId) {
+                const idx = tks.findIndex(t => t.id === editTkId);
+                if (idx !== -1) tks.splice(idx, 1);
+                const ridx = repTks.findIndex(t => t.id === editTkId);
+                if (ridx !== -1) repTks.splice(ridx, 1);
+            }
+            const tk = {
+                id: editTkId || Date.now().toString(),
+                title,
+                description: document.getElementById('tkDesc').value.trim(),
+                category: document.getElementById('tkCat').value,
+                icon: selTkIcon,
+                completed: false
+            };
+            if (selTkRepeat === 'none') {
+                tks.push(tk);
+            } else {
+                const t = new Date(), today = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+                tk.repeat = selTkRepeat;
+                tk.startDate = today;
+                tk.completedDates = [];
+                repTks.push(tk);
+            }
+            saveAll();
+            renderTasks();
+            closeTkModal();
+        }
+
+        function delTk() {
+            const idx = tks.findIndex(t => t.id === editTkId);
+            if (idx !== -1) tks.splice(idx, 1);
+            const ridx = repTks.findIndex(t => t.id === editTkId);
+            if (ridx !== -1) repTks.splice(ridx, 1);
+            saveAll();
+            renderTasks();
+            closeTkModal();
+        }
+
+        function delTkDirect(id, isRep) {
+            if (isRep) {
+                const idx = repTks.findIndex(t => t.id === id);
+                if (idx !== -1) repTks.splice(idx, 1);
+            } else {
+                const idx = tks.findIndex(t => t.id === id);
+                if (idx !== -1) tks.splice(idx, 1);
+            }
+            saveAll();
+            renderTasks();
+        }
+
+        function toggleTk(id, isRep, curDt) {
+            if (isRep) {
+                const tk = repTks.find(t => t.id === id);
+                if (tk && curDt) {
+                    if (!tk.completedDates) tk.completedDates = [];
+                    const idx = tk.completedDates.indexOf(curDt);
+                    if (idx > -1) tk.completedDates.splice(idx, 1);
+                    else tk.completedDates.push(curDt);
+                }
+            } else {
+                const tk = tks.find(t => t.id === id);
+                if (tk) tk.completed = !tk.completed;
+            }
+            saveAll();
+            renderTasks();
+        }
+
+        function updateCatSelects() {
+            const eSel = document.getElementById('evCat');
+            eSel.innerHTML = '';
+            for (let k in evCats) {
+                const o = document.createElement('option');
+                o.value = k;
+                o.textContent = `${evCats[k].icon} ${evCats[k].name}`;
+                eSel.appendChild(o);
+            }
+            const tSel = document.getElementById('tkCat');
+            tSel.innerHTML = '';
+            for (let k in tkCats) {
+                const o = document.createElement('option');
+                o.value = k;
+                o.textContent = `${tkCats[k].icon} ${tkCats[k].name}`;
+                tSel.appendChild(o);
+            }
+        }
+
+        function openCatModal(type) {
+            curCatType = type;
+            document.getElementById('catModalTitle').textContent = type === 'event' ? 'Event Categories' : 'Task Categories';
+            renderCatList();
+            selCatIcon = '';
+            selColor = COLORS[0];
+            renderIconSel('newCatIcon', selCatIcon, ic => selCatIcon = ic);
+            renderColorGrid('newCatColor', selColor, c => selColor = c);
+            document.getElementById('catModal').style.display = 'flex';
+        }
+
+        function closeCatModal() {
+            document.getElementById('catModal').style.display = 'none';
+            document.getElementById('newCatName').value = '';
+        }
+
+        function renderCatList() {
+            const lst = document.getElementById('catList');
+            lst.innerHTML = '';
+            const cats = curCatType === 'event' ? evCats : tkCats;
+            for (let k in cats) {
+                const it = document.createElement('div');
+                it.className = 'category-item';
+                const col = document.createElement('div');
+                col.className = 'category-color';
+                col.style.backgroundColor = cats[k].color;
+                const inf = document.createElement('div');
+                inf.className = 'category-info';
+                const nm = document.createElement('div');
+                nm.textContent = cats[k].name;
+                const ic = document.createElement('div');
+                ic.textContent = cats[k].icon || 'No icon';
+                inf.appendChild(nm);
+                inf.appendChild(ic);
+                const acts = document.createElement('div');
+                acts.className = 'category-actions';
+                const edt = document.createElement('button');
+                edt.className = 'edit-category';
+                edt.textContent = 'Edit';
+                edt.onclick = () => openEditCatModal(k);
+                const rmv = document.createElement('button');
+                rmv.className = 'remove-category';
+                rmv.textContent = 'Remove';
+                rmv.onclick = () => rmvCat(k);
+                acts.appendChild(edt);
+                acts.appendChild(rmv);
+                it.appendChild(col);
+                it.appendChild(inf);
+                it.appendChild(acts);
+                lst.appendChild(it);
+            }
+        }
+
+        function addCat() {
+            const nm = document.getElementById('newCatName').value.trim();
+            if (!nm) { alert('Enter category name'); return; }
+            const k = nm.toLowerCase().replace(/\s+/g, '_');
+            const cats = curCatType === 'event' ? evCats : tkCats;
+            if (cats[k]) { alert('Category already exists'); return; }
+            cats[k] = { name: nm, color: selColor || COLORS[0], icon: selCatIcon || '' };
+            document.getElementById('newCatName').value = '';
+            selCatIcon = '';
+            selColor = COLORS[0];
+            saveAll();
+            updateCatSelects();
+            renderCatList();
+            renderColorGrid('newCatColor', selColor, c => selColor = c);
+            renderIconSel('newCatIcon', '', ic => selCatIcon = ic);
+        }
+
+        function rmvCat(k) {
+            const cats = curCatType === 'event' ? evCats : tkCats;
+            delete cats[k];
+            saveAll();
+            updateCatSelects();
+            renderCatList();
+            if (curCatType === 'event') renderCal();
+            else renderTasks();
+        }
+
+        function openEditCatModal(k) {
+            editCatKey = k;
+            const cats = curCatType === 'event' ? evCats : tkCats;
+            const cat = cats[k];
+            document.getElementById('editCatName').value = cat.name;
+            selEditIcon = cat.icon || '';
+            selEditColor = cat.color;
+            renderIconSel('editCatIcon', selEditIcon, ic => selEditIcon = ic);
+            renderColorGrid('editCatColor', selEditColor, c => selEditColor = c);
+            document.getElementById('editCatModal').style.display = 'flex';
+        }
+
+        function closeEditCatModal() {
+            document.getElementById('editCatModal').style.display = 'none';
+            editCatKey = null;
+        }
+
+        function saveEditCat() {
+            const nm = document.getElementById('editCatName').value.trim();
+            if (!nm) { alert('Enter category name'); return; }
+            const cats = curCatType === 'event' ? evCats : tkCats;
+            cats[editCatKey] = { name: nm, color: selEditColor, icon: selEditIcon };
+            saveAll();
+            updateCatSelects();
+            renderCatList();
+            closeEditCatModal();
+            if (curCatType === 'event') renderCal();
+            else renderTasks();
+        }
+    </script>
+    
+
+    <div class="login-container" id="loginContainer">
+        <h1>🔒 Calendar Login</h1>
+        <div id="errorMessage" class="error-message"></div>
+        <input type="password" id="passwordInput" placeholder="Enter your password" onkeypress="if(event.key==='Enter')doLogin()" />
+        <button type="button" onclick="doLogin()">Login</button>
+        <p style="margin-top: 20px; font-size: 12px; color: #999; text-align: center;">
+            First time? Set your password by typing it and clicking Login.
+        </p>
+    </div>
+
+    <div class="main-container" id="mainContainer">
+        <div class="calendar-container">
+            <div class="header">
+                <h1>📅 Calendar</h1>
+                <div class="header-buttons">
+                    <button class="header-btn" onclick="openCatModal('event')">⚙️ Categories</button>
+                    <button class="header-btn" onclick="doLogout()">Logout</button>
+                </div>
+            </div>
+            <div class="controls">
+                <div class="month-nav">
+                    <button onclick="prevMonth()">← Previous</button>
+                    <h2 id="currentMonth"></h2>
+                    <button onclick="nextMonth()">Next →</button>
+                </div>
+                <button class="add-event-btn" onclick="openEvModal()">+ Add Event</button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+
+        <div class="tasks-container">
+            <div class="tasks-header">
+                <h1>✅ Tasks</h1>
+                <div class="header-buttons">
+                    <button class="header-btn" onclick="openCatModal('task')">⚙️ Categories</button>
+                    <button class="add-event-btn" onclick="openTkModal()">+ Add Task</button>
+                </div>
+            </div>
+            <div class="tasks-content" id="tasksContent"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <h2 id="evModalTitle">Add Event</h2>
+            <div class="form-group">
+                <label>Event Title</label>
+                <input type="text" id="evTitle" />
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="evDate" />
+            </div>
+            <div class="form-group">
+                <label>Time (optional)</label>
+                <input type="time" id="evTime" />
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="evDesc"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="evCat"></select>
+            </div>
+            <div class="form-group">
+                <label>Icon (optional)</label>
+                <div class="icon-selector" id="evIconSel"></div>
+            </div>
+            <div class="form-group">
+                <label>Repeat</label>
+                <div class="repeat-options" id="evRepeat"></div>
+            </div>
+
+            <div class="form-group">
+                <label>Duration (days)</label>
+                <input type="number" id="evDuration" min="1" max="30" value="1" placeholder="1" />
+                <small style="color: #666; font-size: 12px;">Event will span this many consecutive days</small>
+            </div>
+            
+            <div class="button-group">
+                <button class="save-btn" onclick="saveEv()">Save</button>
+                <button class="delete-btn" id="delEvBtn" onclick="delEv()" style="display:none;">Delete</button>
+                <button class="cancel-btn" onclick="closeEvModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <h2 id="tkModalTitle">Add Task</h2>
+            <div class="form-group">
+                <label>Task Title</label>
+                <input type="text" id="tkTitle" />
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="tkDesc"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="tkCat"></select>
+            </div>
+            <div class="form-group">
+                <label>Icon (optional)</label>
+                <div class="icon-selector" id="tkIconSel"></div>
+            </div>
+            <div class="form-group">
+                <label>Repeat</label>
+                <div class="repeat-options" id="tkRepeat"></div>
+            </div>
+            <div class="button-group">
+                <button class="save-btn" onclick="saveTk()">Save</button>
+                <button class="delete-btn" id="delTkBtn" onclick="delTk()" style="display:none;">Delete</button>
+                <button class="cancel-btn" onclick="closeTkModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="catModal">
+        <div class="modal-content">
+            <h2 id="catModalTitle">Manage Categories</h2>
+            <div id="catList"></div>
+            <div style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                <h3>Add Category</h3>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="newCatName" />
+                </div>
+                <div class="form-group">
+                    <label>Icon</label>
+                    <div class="icon-selector" id="newCatIcon"></div>
+                </div>
+                <div class="form-group">
+                    <label>Color</label>
+                    <div class="color-grid" id="newCatColor"></div>
+                </div>
+                <button class="save-btn" onclick="addCat()" style="width:100%;margin-top:10px;">Add</button>
+            </div>
+            <div class="button-group" style="margin-top:20px;">
+                <button class="cancel-btn" onclick="closeCatModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editCatModal">
+        <div class="modal-content">
+            <h2>Edit Category</h2>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="editCatName" />
+            </div>
+            <div class="form-group">
+                <label>Icon</label>
+                <div class="icon-selector" id="editCatIcon"></div>
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <div class="color-grid" id="editCatColor"></div>
+            </div>
+            <div class="button-group">
+                <button class="save-btn" onclick="saveEditCat()">Save</button>
+                <button class="cancel-btn" onclick="closeEditCatModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ICONS = ['🎉','🎂','💼','📅','✈️','🏥','🎓','💪','🍽️','🎵','📚','💻','🎨','⚽','🏀','🤸','🎮','🎬','📞','✉️','🏠','🚗','🎁','❤️','⭐','🔔','📝','💡','🔧','🛒','☕','🌟','🎯','📊','🧹','🧺','🧼','🧽','🧴','🛁','🧻','🗑️','🔨','🪛','🪚'];
+        const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e91e63','#795548','#ff5722','#00bcd4','#4caf50','#ffc107','#673ab7','#009688','#ff4081','#8d6e63'];
+        const REPEATS = [{v:'none',l:'No Repeat'},{v:'daily',l:'Every Day'},{v:'weekly',l:'Every Week'},{v:'biweekly',l:'Every 2 Weeks'},{v:'monthly',l:'Every Month'},{v:'yearly',l:'Every Year'}];
+        
+        let curDate = new Date(), evs = {}, repEvs = [], tks = [], repTks = [], evCats = {}, tkCats = {};
+        let editEvId = null, editTkId = null, editCatKey = null, curCatType = 'event';
+        let selEvIcon = '', selTkIcon = '', selCatIcon = '', selColor = '', selEditColor = '', selEditIcon = '', selRepeat = 'none', selTkRepeat = 'none';
+
+        function hash(s) {
+            let h = 0;
+            for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h &= h;
+            return h.toString();
+        }
+
+        function doLogin() {
+            const pwd = document.getElementById('passwordInput').value, err = document.getElementById('errorMessage');
+            if (!pwd) { err.textContent = 'Enter a password'; return; }
+            const hashed = hash(pwd), stored = localStorage.getItem('cal_pwd');
+            if (!stored) { localStorage.setItem('cal_pwd', hashed); initApp(); }
+            else if (stored === hashed) initApp();
+            else { err.textContent = 'Incorrect password'; }
+        }
+
+        function doLogout() {
+            document.getElementById('loginContainer').style.display = 'block';
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        function initApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            loadAll();
+            renderCal();
+            renderTasks();
+        }
+
+        function loadAll() {
+            evs = JSON.parse(localStorage.getItem('cal_evs') || '{}');
+            repEvs = JSON.parse(localStorage.getItem('cal_rep_evs') || '[]');
+            tks = JSON.parse(localStorage.getItem('cal_tks') || '[]');
+            repTks = JSON.parse(localStorage.getItem('cal_rep_tks') || '[]');
+            evCats = JSON.parse(localStorage.getItem('cal_ev_cats') || '{"personal":{"name":"Personal","color":"#3498db","icon":"👤"},"work":{"name":"Work","color":"#e74c3c","icon":"💼"}}');
+            tkCats = JSON.parse(localStorage.getItem('cal_tk_cats') || '{"cleaning":{"name":"Cleaning","color":"#3498db","icon":"🧹"},"shopping":{"name":"Shopping","color":"#f39c12","icon":"🛒"}}');
+            updateCatSelects();
+        }
+
+        function saveAll() {
+            localStorage.setItem('cal_evs', JSON.stringify(evs));
+            localStorage.setItem('cal_rep_evs', JSON.stringify(repEvs));
+            localStorage.setItem('cal_tks', JSON.stringify(tks));
+            localStorage.setItem('cal_rep_tks', JSON.stringify(repTks));
+            localStorage.setItem('cal_ev_cats', JSON.stringify(evCats));
+            localStorage.setItem('cal_tk_cats', JSON.stringify(tkCats));
+        }
+
+        function getRepEvs(dateKey) {
+            const d = new Date(dateKey), res = [];
+            repEvs.forEach(ev => {
+                const ed = new Date(ev.startDate);
+                if (d < ed) return;
+                let show = false;
+                if (ev.repeat === 'daily') show = true;
+                else if (ev.repeat === 'weekly') show = d.getDay() === ed.getDay();
+                else if (ev.repeat === 'biweekly') {
+                    const diff = Math.floor((d - ed) / 86400000);
+                    show = d.getDay() === ed.getDay() && diff % 14 === 0;
+                }
+                else if (ev.repeat === 'monthly') show = d.getDate() === ed.getDate();
+                else if (ev.repeat === 'yearly') show = d.getDate() === ed.getDate() && d.getMonth() === ed.getMonth();
+                if (show) res.push({...ev, isRepeating: true});
+            });
+            return res;
+        }
+
+        function getRepTks() {
+            const t = new Date(), tk = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`, res = [];
+            repTks.forEach(task => {
+                if (!task.startDate) return;
+                const td = new Date(task.startDate), today = new Date(tk);
+                if (today < td) return;
+                let show = false;
+                if (task.repeat === 'daily') show = true;
+                else if (task.repeat === 'weekly') show = today.getDay() === td.getDay();
+                else if (task.repeat === 'biweekly') {
+                    const diff = Math.floor((today - td) / 86400000);
+                    show = today.getDay() === td.getDay() && diff % 14 === 0;
+                }
+                else if (task.repeat === 'monthly') show = today.getDate() === td.getDate();
+                else if (task.repeat === 'yearly') show = today.getDate() === td.getDate() && today.getMonth() === td.getMonth();
+                if (show) {
+                    const done = task.completedDates && task.completedDates.includes(tk);
+                    res.push({...task, isRepeating: true, completed: done, currentDate: tk});
+                }
+            });
+            return res;
+        }
+
+        function renderCal() {
+            const y = curDate.getFullYear(), m = curDate.getMonth();
+            document.getElementById('currentMonth').textContent = curDate.toLocaleString('default', {month: 'long', year: 'numeric'});
+            const fd = new Date(y, m, 1), ld = new Date(y, m + 1, 0), pld = new Date(y, m, 0);
+            const start = fd.getDay(), total = ld.getDate(), grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+                const h = document.createElement('div');
+                h.className = 'day-header';
+                h.textContent = d;
+                grid.appendChild(h);
+            });
+            for (let i = start - 1; i >= 0; i--) grid.appendChild(mkCell(pld.getDate() - i, y, m - 1, true));
+            for (let d = 1; d <= total; d++) grid.appendChild(mkCell(d, y, m, false));
+            const rem = 42 - (start + total);
+            for (let d = 1; d <= rem; d++) grid.appendChild(mkCell(d, y, m + 1, true));
+        }
+
+        function mkCell(day, y, m, other) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell' + (other ? ' other-month' : '');
+            const num = document.createElement('div');
+            num.className = 'day-number';
+            num.textContent = day;
+            cell.appendChild(num);
+            const dk = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const all = [...(evs[dk] || []), ...getRepEvs(dk)];
+            all.forEach(ev => {
+                const el = document.createElement('div');
+                el.className = 'event-item' + (ev.isRepeating ? ' repeating' : '');
+                el.style.backgroundColor = evCats[ev.category]?.color || '#999';
+                const ic = ev.icon || evCats[ev.category]?.icon || '';
+                el.textContent = (ic ? ic + ' ' : '') + (ev.time ? ev.time + ' ' : '') + ev.title;
+                el.onclick = e => { e.stopPropagation(); openEvModal(ev.id, dk, ev.isRepeating); };
+                cell.appendChild(el);
+            });
+            if (!other) cell.onclick = () => openEvModal(null, dk);
+            return cell;
+        }
+
+        function prevMonth() { curDate.setMonth(curDate.getMonth() - 1); renderCal(); }
+        function nextMonth() { curDate.setMonth(curDate.getMonth() + 1); renderCal(); }
+
+        function renderIconSel(cid, sel, cb) {
+            const c = document.getElementById(cid);
+            c.innerHTML = '';
+            ICONS.forEach(ic => {
+                const o = document.createElement('div');
+                o.className = 'icon-option' + (ic === sel ? ' selected' : '');
+                o.textContent = ic;
+                o.onclick = () => {
+                    c.querySelectorAll('.icon-option').forEach(e => e.classList.remove('selected'));
+                    o.classList.add('selected');
+                    cb(ic);
+                };
+                c.appendChild(o);
+            });
+        }
+
+        function renderColorGrid(cid, sel, cb) {
+            const c = document.getElementById(cid);
+            c.innerHTML = '';
+            COLORS.forEach(col => {
+                const s = document.createElement('div');
+                s.className = 'color-swatch' + (col === sel ? ' selected' : '');
+                s.style.backgroundColor = col;
+                s.onclick = () => {
+                    c.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('selected'));
+                    s.classList.add('selected');
+                    cb(col);
+                };
+                c.appendChild(s);
+            });
+        }
+
+        function renderRepOpts(cid, sel, cb) {
+            const c = document.getElementById(cid);
+            c.innerHTML = '';
+            REPEATS.forEach(r => {
+                const o = document.createElement('div');
+                o.className = 'repeat-option' + (r.v === sel ? ' selected' : '');
+                o.textContent = r.l;
+                o.onclick = () => {
+                    c.querySelectorAll('.repeat-option').forEach(e => e.classList.remove('selected'));
+                    o.classList.add('selected');
+                    cb(r.v);
+                };
+                c.appendChild(o);
+            });
+        }
+
+        function openEvModal(id = null, dk = null, isRep = false) {
+            editEvId = id;
+            const del = document.getElementById('delEvBtn');
+            if (id) {
+                document.getElementById('evModalTitle').textContent = 'Edit Event';
+                del.style.display = 'block';
+                let ev = null;
+                if (isRep) { ev = repEvs.find(e => e.id === id); if (ev) dk = ev.startDate; }
+                else { for (let d in evs) { ev = evs[d].find(e => e.id === id); if (ev) { dk = d; break; } } }
+                if (ev) {
+                    document.getElementById('evTitle').value = ev.title;
+                    document.getElementById('evDate').value = dk;
+                    document.getElementById('evTime').value = ev.time || '';
+                    document.getElementById('evDesc').value = ev.description || '';
+                    document.getElementById('evCat').value = ev.category;
+                    selEvIcon = ev.icon || '';
+                    selRepeat = ev.repeat || 'none';
+                }
+            } else {
+                document.getElementById('evModalTitle').textContent = 'Add Event';
+                del.style.display = 'none';
+                document.getElementById('evTitle').value = '';
+                document.getElementById('evDate').value = dk || '';
+                document.getElementById('evTime').value = '';
+                document.getElementById('evDesc').value = '';
+                document.getElementById('evCat').value = Object.keys(evCats)[0];
+                selEvIcon = '';
+                selRepeat = 'none';
+            }
+            renderIconSel('evIconSel', selEvIcon, ic => selEvIcon = ic);
+            renderRepOpts('evRepeat', selRepeat, r => selRepeat = r);
+            document.getElementById('eventModal').style.display = 'flex';
+        }
+
+        function closeEvModal() {
+            document.getElementById('eventModal').style.display = 'none';
+            editEvId = null;
+            selEvIcon = '';
+            selRepeat = 'none';
+        }
+
+        function saveEv() {
+            const title = document.getElementById('evTitle').value.trim();
+            const date = document.getElementById('evDate').value;
+            if (!title || !date) { alert('Enter title and date'); return; }
+            if (editEvId) {
+                for (let dk in evs) {
+                    const idx = evs[dk].findIndex(e => e.id === editEvId);
+                    if (idx !== -
