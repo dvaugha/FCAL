@@ -1301,8 +1301,18 @@
             }
             draftListEvents.forEach((e, idx) => {
                 const d = document.createElement('div');
-                d.style.cssText = "background:white; margin:5px 0; padding:8px; border-radius:4px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center;";
-                d.innerHTML = `<span>${e.title} (${e.repeat})</span> <button onclick="draftListEvents.splice(${idx},1);renderDraftEvents()" style="color:red;border:none;background:none;cursor:pointer;">X</button>`;
+                d.style.cssText = "background:white; margin:5px 0; padding:8px; border-radius:4px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center; cursor:pointer;";
+                d.title = "Click to view details";
+                d.onclick = () => {
+                    let msg = `Event: ${e.title}\n`;
+                    msg += `Start Date: ${e.startDate || 'None'}\n`;
+                    msg += `Time: ${e.time ? formatTime(e.time) : 'None'}\n`;
+                    msg += `Repeat: ${e.repeat}\n`;
+                    msg += `End Date: ${e.endDate ? e.endDate : 'No End Date'}`;
+                    alert(msg);
+                };
+
+                d.innerHTML = `<span>${e.title} <small style='color:#666'>(${e.repeat})</small></span> <button onclick="event.stopPropagation(); draftListEvents.splice(${idx},1);renderDraftEvents()" style="color:red;border:none;background:none;cursor:pointer;font-weight:bold;">X</button>`;
                 c.appendChild(d);
             });
         }
