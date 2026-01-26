@@ -1051,6 +1051,12 @@
             eventLists.forEach(list => {
                 const start = document.createElement('div');
                 start.className = 'task-item'; // Reuse task style
+                start.onclick = (e) => {
+                    // If clicking buttons, don't open modal
+                    if (e.target.tagName === 'BUTTON') return;
+                    openListDetailModal(list.id);
+                };
+                start.style.cursor = 'pointer';
                 start.innerHTML = `
                     <div class="task-icon">📋</div>
                     <div class="task-details">
