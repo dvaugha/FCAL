@@ -936,7 +936,7 @@
     </div>
 
     <div id="globalTooltip" class="event-tooltip"
-        style="position:fixed; z-index:99999; pointer-events:none; transition:opacity 0.1s;"></div>
+        style="position:fixed; z-index:2147483647; pointer-events:none; transition:opacity 0.1s;"></div>
     <script>
 
         let currentDate = new Date();
@@ -1365,17 +1365,25 @@
                 };
 
                 d.onclick = () => {
+                    // Force hide tooltip
+                    const gt = document.getElementById('globalTooltip');
+                    gt.style.visibility = 'hidden';
+                    gt.style.opacity = '0';
+
                     // EDIT MODE: Populate fields
                     if (confirm("Edit this item? It will be removed from the list and put back in the form.")) {
-                        document.getElementById('listEventTitle').value = e.title;
-                        document.getElementById('listEventDate').value = e.startDate || '';
-                        document.getElementById('listEventTime').value = e.time || '';
-                        document.getElementById('listEventRepeat').value = e.repeat;
-                        document.getElementById('listEventEndDate').value = e.endDate || '';
+                        // We use setTimeout to ensure UI updates don't conflict with alert close
+                        setTimeout(() => {
+                            document.getElementById('listEventTitle').value = e.title;
+                            document.getElementById('listEventDate').value = e.startDate || '';
+                            document.getElementById('listEventTime').value = e.time || '';
+                            document.getElementById('listEventRepeat').value = e.repeat;
+                            document.getElementById('listEventEndDate').value = e.endDate || '';
 
-                        // Remove from list so user can save updated version
-                        draftListEvents.splice(idx, 1);
-                        renderDraftEvents();
+                            // Remove from list so user can save updated version
+                            draftListEvents.splice(idx, 1);
+                            renderDraftEvents();
+                        }, 50);
                     }
                 };
 
