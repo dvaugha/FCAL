@@ -1310,14 +1310,32 @@
             draftListEvents.forEach((e, idx) => {
                 const d = document.createElement('div');
                 d.style.cssText = "background:white; margin:5px 0; padding:8px; border-radius:4px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center; cursor:pointer;";
-                d.title = "Click to view details";
+
+                // Construct Hover String
+                let hoverText = `${e.title}`;
+                if (e.repeat !== 'none') {
+                    hoverText += ` - ${e.repeat.charAt(0).toUpperCase() + e.repeat.slice(1)}`;
+                    if (e.time) hoverText += ` at ${formatTime(e.time)}`;
+                    hoverText += ` until ${e.endDate ? e.endDate : 'No End Date'}`;
+                } else {
+                    if (e.startDate) hoverText += ` on ${e.startDate}`;
+                    if (e.time) hoverText += ` at ${formatTime(e.time)}`;
+                }
+                d.title = hoverText;
+
                 d.onclick = () => {
-                    let msg = `Event: ${e.title}\n`;
-                    msg += `Start Date: ${e.startDate || 'None'}\n`;
-                    msg += `Time: ${e.time ? formatTime(e.time) : 'None'}\n`;
-                    msg += `Repeat: ${e.repeat}\n`;
-                    msg += `End Date: ${e.endDate ? e.endDate : 'No End Date'}`;
-                    alert(msg);
+                    // EDIT MODE: Populate fields
+                    if (confirm("Edit this item? It will be removed from the list and put back in the form.")) {
+                        document.getElementById('listEventTitle').value = e.title;
+                        document.getElementById('listEventDate').value = e.startDate || '';
+                        document.getElementById('listEventTime').value = e.time || '';
+                        document.getElementById('listEventRepeat').value = e.repeat;
+                        document.getElementById('listEventEndDate').value = e.endDate || '';
+
+                        // Remove from list so user can save updated version
+                        draftListEvents.splice(idx, 1);
+                        renderDraftEvents();
+                    }
                 };
 
                 d.innerHTML = `<span>${e.title} <small style='color:#666'>(${e.repeat})</small></span> <button onclick="event.stopPropagation(); draftListEvents.splice(${idx},1);renderDraftEvents()" style="color:red;border:none;background:none;cursor:pointer;font-weight:bold;">X</button>`;
