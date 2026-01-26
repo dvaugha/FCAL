@@ -1177,6 +1177,9 @@
 
             const all = [...(events[dk] || []), ...getRepEvents(dk)];
             all.forEach(e => {
+                // FILTER CHECK FOR PRINT
+                if (currentEventFilter !== 'all' && e.category !== currentEventFilter) return;
+
                 const div = document.createElement('div');
                 div.className = 'print-event';
                 // Inline color for print
@@ -1284,14 +1287,20 @@
             draftListEvents = [];
 
             if (listId) {
-                // Edit existing logic would go here
+                const list = eventLists.find(l => l.id === listId);
+                if (list) {
+                    document.getElementById('listDetailTitle').innerText = 'Edit List';
+                    document.getElementById('listName').value = list.name;
+                    document.getElementById('listDesc').value = list.description || '';
+                    // Clone events to avoid modifying original until save
+                    draftListEvents = JSON.parse(JSON.stringify(list.events));
+                }
             } else {
                 document.getElementById('listDetailTitle').innerText = 'Create New List';
             }
             renderDraftEvents();
             m.style.display = 'flex';
         }
-
         function closeListDetailModal() {
             document.getElementById('listDetailModal').style.display = 'none';
         }
@@ -1333,57 +1342,57 @@
             draftListEvents.forEach((e, idx) => {
                 const d = document.createElement('div');
                 d.className = 'list-item-draft';
+                d.style.position = 'relative';
 
-                // Construct Hover String
-                let hoverText = `${e.title}`;
+                // Construct Hover HTML (Rich)
+                let hoverHTML = `<div style="text-align:left;"><strong>${e.title}</strong></div>`;
                 if (e.repeat !== 'none') {
-                    hoverText += ` - ${e.repeat.charAt(0).toUpperCase() + e.repeat.slice(1)}`;
-                    if (e.time) hoverText += ` at ${formatTime(e.time)}`;
-                    hoverText += ` until ${e.endDate ? e.endDate : 'No End Date'}`;
+                    hoverHTML += `<div style="text-align:left; color:#aaf; font-size:0.9em;">${e.repeat.charAt(0).toUpperCase() + e.repeat.slice(1)}</div>`;
+                    if (e.time) hoverHTML += `<div style="text-align:left;">Time: ${formatTime(e.time)}</div>`;
+                    if (e.endDate) hoverHTML += `<div style="text-align:left; font-size:0.8em; color:#ccc;">Until: ${e.endDate}</div>`;
                 } else {
-                    if (e.startDate) hoverText += ` on ${e.startDate}`;
-                    if (e.time) hoverText += ` at ${formatTime(e.time)}`;
+                    if (e.startDate) hoverHTML += `<div style="text-align:left;">Date: ${e.startDate}</div>`;
+                    if (e.time) hoverHTML += `<div style="text-align:left;">Time: ${formatTime(e.time)}</div>`;
                 }
 
-                // Tooltip Logic using Global Fixed Tooltip to avoid overflow clipping
+                // Tooltip Logic
                 d.onmouseenter = () => {
                     const gt = document.getElementById('globalTooltip');
-                    gt.textContent = hoverText;
-                    gt.style.visibility = 'visible';
-                    gt.style.opacity = '1';
+                    if (gt) {
+                        gt.innerHTML = hoverHTML;
+                        gt.style.visibility = 'visible';
+                        gt.style.opacity = '1';
+                    }
                 };
                 d.onmousemove = (ev) => {
                     const gt = document.getElementById('globalTooltip');
-                    // Position 15px down and right of cursor
-                    gt.style.left = (ev.clientX + 15) + 'px';
-                    gt.style.top = (ev.clientY + 15) + 'px';
+                    if (gt) {
+                        gt.style.left = (ev.clientX + 15) + 'px';
+                        gt.style.top = (ev.clientY + 15) + 'px';
+                    }
                 };
                 d.onmouseleave = () => {
                     const gt = document.getElementById('globalTooltip');
-                    gt.style.visibility = 'hidden';
-                    gt.style.opacity = '0';
+                    if (gt) {
+                        gt.style.visibility = 'hidden';
+                        gt.style.opacity = '0';
+                    }
                 };
 
+                // Edit Item Logic
                 d.onclick = () => {
-                    // Force hide tooltip
                     const gt = document.getElementById('globalTooltip');
-                    gt.style.visibility = 'hidden';
-                    gt.style.opacity = '0';
+                    if (gt) { gt.style.visibility = 'hidden'; gt.style.opacity = '0'; }
 
-                    // EDIT MODE: Populate fields
-                    if (confirm("Edit this item? It will be removed from the list and put back in the form.")) {
-                        // We use setTimeout to ensure UI updates don't conflict with alert close
-                        setTimeout(() => {
-                            document.getElementById('listEventTitle').value = e.title;
-                            document.getElementById('listEventDate').value = e.startDate || '';
-                            document.getElementById('listEventTime').value = e.time || '';
-                            document.getElementById('listEventRepeat').value = e.repeat;
-                            document.getElementById('listEventEndDate').value = e.endDate || '';
+                    if (confirm("Edit this item? It will be moved to the form fields.")) {
+                        document.getElementById('listEventTitle').value = e.title;
+                        document.getElementById('listEventDate').value = e.startDate || '';
+                        document.getElementById('listEventTime').value = e.time || '';
+                        document.getElementById('listEventRepeat').value = e.repeat;
+                        document.getElementById('listEventEndDate').value = e.endDate || '';
 
-                            // Remove from list so user can save updated version
-                            draftListEvents.splice(idx, 1);
-                            renderDraftEvents();
-                        }, 50);
+                        draftListEvents.splice(idx, 1);
+                        renderDraftEvents();
                     }
                 };
 
@@ -1392,13 +1401,13 @@
                 d.appendChild(contentSpan);
 
                 const delBtn = document.createElement('button');
+                delBtn.textContent = 'X';
+                delBtn.style.cssText = "color:red;border:none;background:none;cursor:pointer;font-weight:bold;margin-left:auto;";
                 delBtn.onclick = (evt) => {
                     evt.stopPropagation();
                     draftListEvents.splice(idx, 1);
                     renderDraftEvents();
                 };
-                delBtn.style.cssText = "color:red;border:none;background:none;cursor:pointer;font-weight:bold;";
-                delBtn.textContent = 'X';
                 d.appendChild(delBtn);
 
                 c.appendChild(d);
@@ -1411,13 +1420,24 @@
             if (!name) return alert("List name required");
             if (draftListEvents.length === 0) return alert("Add at least one event");
 
-            const newList = {
-                id: Date.now().toString(),
-                name: name,
-                description: desc,
-                events: draftListEvents
-            };
-            eventLists.push(newList);
+            if (currentListId) {
+                // Update existing
+                const list = eventLists.find(l => l.id === currentListId);
+                if (list) {
+                    list.name = name;
+                    list.description = desc;
+                    list.events = draftListEvents;
+                }
+            } else {
+                // Create new
+                const newList = {
+                    id: Date.now().toString(),
+                    name: name,
+                    description: desc,
+                    events: draftListEvents
+                };
+                eventLists.push(newList);
+            }
             save();
             closeListDetailModal();
             renderLists();
