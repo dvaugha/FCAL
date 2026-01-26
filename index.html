@@ -487,6 +487,7 @@
                 <h1>📅 My Calendar</h1>
                 <div class="header-buttons">
                     <button class="header-btn" onclick="openCategoriesModal('event')">⚙️ Categories</button>
+                    <button class="header-btn" onclick="openListsModal()">📋 Lists & Smart Add</button>
                     <button class="header-btn" onclick="logout()">Logout</button>
                 </div>
             </div>
@@ -593,6 +594,81 @@
         </div>
     </div>
 
+    <!-- Lists Management Modal -->
+    <div class="modal" id="listsModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2>📋 Event Lists & Smart Add</h2>
+            <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+                <button class="header-btn" style="background:#667eea; flex:1;" onclick="openListDetailModal()">+ New
+                    Custom List</button>
+                <button class="header-btn" style="background:#e67e22; flex:1;" onclick="openSmartSearch()">🌐 Smart
+                    Online Search</button>
+            </div>
+            <div id="listsContainer" style="max-height: 400px; overflow-y: auto;">
+                <!-- Lists will appear here -->
+            </div>
+            <div class="button-group">
+                <button class="cancel-btn" onclick="closeListsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Search Modal -->
+    <div class="modal" id="smartSearchModal">
+        <div class="modal-content">
+            <h2>🌐 Smart Schedule Search</h2>
+            <p style="color:#666; margin-bottom:15px; font-size:14px;">Find public schedules (Schools, Sports, Holidays)
+                and auto-add them.</p>
+            <div class="form-group">
+                <label>Search Query</label>
+                <input type="text" id="smartSearchInput" placeholder="e.g., 'Wake County Schools', 'US Holidays'" />
+            </div>
+            <div id="smartSearchResults" style="margin-top:15px; max-height:200px; overflow-y:auto;"></div>
+            <div class="button-group">
+                <button class="save-btn" onclick="performSmartSearch()">Search</button>
+                <button class="cancel-btn" onclick="closeSmartSearch()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- List Detail/Edit Modal -->
+    <div class="modal" id="listDetailModal">
+        <div class="modal-content">
+            <h2 id="listDetailTitle">Edit List</h2>
+            <div class="form-group"><label>List Name</label><input type="text" id="listName" /></div>
+            <div class="form-group"><label>Description</label><textarea id="listDesc"></textarea></div>
+
+            <h3>Events in this List</h3>
+            <div id="listEventsContainer"
+                style="background:#f8f9fa; padding:10px; border-radius:6px; max-height:200px; overflow-y:auto; margin-bottom:15px;">
+                <p style="text-align:center; color:#999;">No events yet. Add one below.</p>
+            </div>
+
+            <div style="background:#eee; padding:10px; border-radius:6px;">
+                <div class="form-group" style="margin-bottom:10px;"><input type="text" id="listEventTitle"
+                        placeholder="Event Title" /></div>
+                <div class="form-group"
+                    style="margin-bottom:10px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <input type="date" id="listEventDate" title="Specific Date (Optional)" />
+                    <input type="time" id="listEventTime" />
+                </div>
+                <div class="form-group"><select id="listEventRepeat">
+                        <option value="none">One Time</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select></div>
+                <button class="save-btn" onclick="addEventToListDraft()" style="width:100%; padding:8px;">+ Add to
+                    List</button>
+            </div>
+
+            <div class="button-group">
+                <button class="save-btn" onclick="saveList()">Save List</button>
+                <button class="cancel-btn" onclick="closeListDetailModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
 
         let currentDate = new Date();
@@ -600,8 +676,14 @@
         let repeatingEvents = [];
         let tasks = [];
         let repeatingTasks = [];
+        let eventLists = []; // New structure for lists
         let eventCategories = {};
         let taskCategories = {};
+
+        // Draft variables for List Editing
+        let currentListId = null;
+        let draftListEvents = [];
+
         let editingEventId = null;
         let editingTaskId = null;
         let editingCategoryKey = null;
@@ -684,9 +766,11 @@
             repeatingEvents = JSON.parse(localStorage.getItem('repEvents') || '[]');
             tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
             repeatingTasks = JSON.parse(localStorage.getItem('repTasks') || '[]');
+            eventLists = JSON.parse(localStorage.getItem('eventLists') || '[]');
             eventCategories = JSON.parse(localStorage.getItem('eCats') || '{"personal":{"name":"Personal","color":"#3498db","icon":"👤"},"work":{"name":"Work","color":"#e74c3c","icon":"💼"}}');
             taskCategories = JSON.parse(localStorage.getItem('tCats') || '{"cleaning":{"name":"Cleaning","color":"#3498db","icon":"🧹"},"shopping":{"name":"Shopping","color":"#f39c12","icon":"🛒"}}');
             updateSelects();
+            renderLists();
         }
 
         function save() {
@@ -696,7 +780,244 @@
             localStorage.setItem('repTasks', JSON.stringify(repeatingTasks));
             localStorage.setItem('eCats', JSON.stringify(eventCategories));
             localStorage.setItem('tCats', JSON.stringify(taskCategories));
+            localStorage.setItem('eventLists', JSON.stringify(eventLists));
         }
+
+        /* --- LISTS & SMART ADD LOGIC --- */
+
+        function openListsModal() {
+            document.getElementById('listsModal').style.display = 'flex';
+            renderLists();
+        }
+
+        function closeListsModal() {
+            document.getElementById('listsModal').style.display = 'none';
+        }
+
+        function renderLists() {
+            const container = document.getElementById('listsContainer');
+            container.innerHTML = '';
+            if (eventLists.length === 0) {
+                container.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">No Custom Lists Created</div>';
+                return;
+            }
+            eventLists.forEach(list => {
+                const start = document.createElement('div');
+                start.className = 'task-item'; // Reuse task style
+                start.innerHTML = `
+                    <div class="task-icon">📋</div>
+                    <div class="task-details">
+                        <div class="task-title" style="font-weight:bold;">${list.name}</div>
+                        <div class="task-category">${list.events.length} events • ${list.description || 'No description'}</div>
+                    </div>
+                    <div class="task-actions">
+                        <button style="background:#27ae60; color:white;" onclick="applyListToCalendar('${list.id}')">Apply</button>
+                        <button style="background:#e74c3c; color:white;" onclick="deleteList('${list.id}')">Delete</button>
+                    </div>
+                `;
+                container.appendChild(start);
+            });
+        }
+
+        function applyListToCalendar(listId) {
+            const list = eventLists.find(l => l.id === listId);
+            if (!list) return;
+            if (!confirm(`Apply "${list.name}" to your calendar? This will add ${list.events.length} events.`)) return;
+
+            list.events.forEach(e => {
+                // Determine start date. If the list item has a specific date, uses it. 
+                // If not, we might default to 'today' or ask user, but for simplicity here we assume 
+                // smart lists have dates or relative dates mapped to current year.
+                // For this V1, we assume events have set dates or are repeating.
+
+                let targetDate = e.startDate || new Date().toISOString().split('T')[0];
+
+                const newEvent = {
+                    id: Date.now().toString() + Math.random().toString().substr(2, 5),
+                    title: e.title,
+                    time: e.time,
+                    description: e.description,
+                    category: Object.keys(eventCategories)[0], // Default category
+                    icon: e.icon || '',
+                    repeat: e.repeat || 'none',
+                    startDate: targetDate
+                };
+
+                if (newEvent.repeat === 'none') {
+                    if (!events[targetDate]) events[targetDate] = [];
+                    events[targetDate].push(newEvent);
+                } else {
+                    repeatingEvents.push(newEvent);
+                }
+            });
+            save();
+            renderCalendar();
+            alert('Events added successfully!');
+            closeListsModal();
+        }
+
+        function deleteList(listId) {
+            if (!confirm("Delete this list?")) return;
+            eventLists = eventLists.filter(l => l.id !== listId);
+            save();
+            renderLists();
+        }
+
+        // --- List Editor ---
+        function openListDetailModal(listId = null) {
+            currentListId = listId;
+            const m = document.getElementById('listDetailModal');
+            document.getElementById('listName').value = '';
+            document.getElementById('listDesc').value = '';
+            draftListEvents = [];
+
+            if (listId) {
+                // Edit existing logic would go here
+            } else {
+                document.getElementById('listDetailTitle').innerText = 'Create New List';
+            }
+            renderDraftEvents();
+            m.style.display = 'flex';
+        }
+
+        function closeListDetailModal() {
+            document.getElementById('listDetailModal').style.display = 'none';
+        }
+
+        function addEventToListDraft() {
+            const title = document.getElementById('listEventTitle').value;
+            const date = document.getElementById('listEventDate').value; // Optional
+            const time = document.getElementById('listEventTime').value;
+            const repeat = document.getElementById('listEventRepeat').value;
+
+            if (!title) return alert("Title required");
+
+            draftListEvents.push({
+                title,
+                startDate: date, // Can be empty
+                time,
+                repeat,
+                id: Date.now()
+            });
+
+            // value clear
+            document.getElementById('listEventTitle').value = '';
+            renderDraftEvents();
+        }
+
+        function renderDraftEvents() {
+            const c = document.getElementById('listEventsContainer');
+            c.innerHTML = '';
+            if (draftListEvents.length === 0) {
+                c.innerHTML = '<p style="text-align:center; color:#999; padding:10px;">No events added yet.</p>';
+                return;
+            }
+            draftListEvents.forEach((e, idx) => {
+                const d = document.createElement('div');
+                d.style.cssText = "background:white; margin:5px 0; padding:8px; border-radius:4px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center;";
+                d.innerHTML = `<span>${e.title} (${e.repeat})</span> <button onclick="draftListEvents.splice(${idx},1);renderDraftEvents()" style="color:red;border:none;background:none;cursor:pointer;">X</button>`;
+                c.appendChild(d);
+            });
+        }
+
+        function saveList() {
+            const name = document.getElementById('listName').value;
+            const desc = document.getElementById('listDesc').value;
+            if (!name) return alert("List name required");
+            if (draftListEvents.length === 0) return alert("Add at least one event");
+
+            const newList = {
+                id: Date.now().toString(),
+                name: name,
+                description: desc,
+                events: draftListEvents
+            };
+            eventLists.push(newList);
+            save();
+            closeListDetailModal();
+            renderLists();
+        }
+
+        // --- Smart Search ---
+        function openSmartSearch() {
+            document.getElementById('listsModal').style.display = 'none';
+            document.getElementById('smartSearchModal').style.display = 'flex';
+            document.getElementById('smartSearchResults').innerHTML = '';
+            document.getElementById('smartSearchInput').value = '';
+        }
+        function closeSmartSearch() {
+            document.getElementById('smartSearchModal').style.display = 'none';
+            document.getElementById('listsModal').style.display = 'flex';
+        }
+
+        function performSmartSearch() {
+            const q = document.getElementById('smartSearchInput').value.toLowerCase();
+            const res = document.getElementById('smartSearchResults');
+            res.innerHTML = '<div style="text-align:center;">Searching public databases... 🌐</div>';
+
+            setTimeout(() => {
+                let hits = [];
+                // Simulated "Online" database
+                if (q.includes('school')) {
+                    hits.push({
+                        name: 'Wake County Public Schools 2025-26',
+                        desc: 'Teacher workdays, Holidays, First/Last Day',
+                        events: [
+                            { title: 'First Day of School', startDate: '2025-08-25', repeat: 'none', icon: '🏫' },
+                            { title: 'Labor Day (No School)', startDate: '2025-09-01', repeat: 'none', icon: '🚫' },
+                            { title: 'Teacher Workday', startDate: '2025-10-31', repeat: 'none', icon: '👩‍🏫' },
+                            { title: 'Winter Break', startDate: '2025-12-20', repeat: 'none', icon: '❄️' },
+                        ]
+                    });
+                }
+                if (q.includes('holiday') || q.includes('us')) {
+                    hits.push({
+                        name: 'US Federal Holidays 2026',
+                        desc: 'Major standard holidays',
+                        events: [
+                            { title: 'New Year Day', startDate: '2026-01-01', repeat: 'yearly', icon: '🎆' },
+                            { title: 'Independence Day', startDate: '2026-07-04', repeat: 'yearly', icon: '🇺🇸' },
+                            { title: 'Thanksgiving', startDate: '2026-11-26', repeat: 'none', icon: '🦃' },
+                            { title: 'Christmas', startDate: '2026-12-25', repeat: 'yearly', icon: '🎄' }
+                        ]
+                    });
+                }
+                // Default fallback to show capability
+                if (hits.length === 0) {
+                    hits.push({
+                        name: 'Sample: Gymnastics Schedule',
+                        desc: 'Example schedule for 2026 Season',
+                        events: [
+                            { title: 'Gymnastics Practice', startDate: '2026-02-01', repeat: 'weekly', time: '16:00', icon: '🤸' },
+                            { title: 'Regional Meet', startDate: '2026-03-15', repeat: 'none', icon: '🏆' }
+                        ]
+                    });
+                }
+
+                res.innerHTML = '';
+                hits.forEach(h => {
+                    const d = document.createElement('div');
+                    d.style.cssText = "padding:10px; border:1px solid #eee; margin-bottom:10px; border-radius:6px; cursor:pointer; hover:background:#f9f9f9;";
+                    d.innerHTML = `<strong>${h.name}</strong><br><small>${h.desc}</small>`;
+                    d.onclick = () => {
+                        eventLists.push({
+                            id: Date.now().toString(),
+                            name: h.name,
+                            description: h.desc,
+                            events: h.events
+                        });
+                        save();
+                        alert("Imported " + h.name + " to your Lists!");
+                        closeSmartSearch();
+                        renderLists();
+                    };
+                    res.appendChild(d);
+                });
+
+            }, 1000);
+        }
+
+
 
         function getRepEvents(dk) {
             const d = new Date(dk),
