@@ -1436,6 +1436,120 @@
             return arr;
         }
 
+        // Click Debounce Timer
+        let clickTimer = null;
+
+        // --- Move / Drag Logic ---
+
+        function handleDrop(e, newDate) {
+            e.preventDefault();
+            e.target.style.background = ''; // reset drag visual
+            try {
+                const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+                if (data.id && data.oldDate !== newDate) {
+                    executeMove(data.id, data.oldDate, newDate, data.title, data.isRepeating);
+                }
+            } catch (err) { console.error('Drop error', err); }
+        }
+
+        function promptMoveEvent(id, oldDate, isRepeating) {
+            let ev = null;
+            if (isRepeating) ev = repeatingEvents.find(e => e.id === id);
+            else if (events[oldDate]) ev = events[oldDate].find(e => e.id === id);
+
+            if (!ev) return;
+
+            const newDate = prompt("Move event to date (YYYY-MM-DD):", oldDate);
+            if (newDate && newDate !== oldDate) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert("Invalid date format. Use YYYY-MM-DD");
+                executeMove(id, oldDate, newDate, ev.title, isRepeating);
+            }
+        }
+
+        function executeMove(id, oldDate, newDate, title, isRepeating) {
+            // Check for Series "(Day X/Y)"
+            const seriesMatch = title.match(/(.*) \(Day (\d+)\/(\d+)\)/);
+
+            if (!isRepeating && seriesMatch) {
+                // It's a multi-day series part
+                if (confirm("This is part of a multi-day series. Move the entire series?")) {
+                    moveSeries(seriesMatch[1], seriesMatch[2], seriesMatch[3], oldDate, newDate);
+                    return;
+                }
+            }
+
+            // Normal Move
+            if (isRepeating) {
+                if (!confirm("Move this repeating event? This will change the start date for the pattern.")) return;
+                const re = repeatingEvents.find(e => e.id === id);
+                if (re) {
+                    re.startDate = newDate;
+                    save();
+                    renderCalendar();
+                }
+            } else {
+                // One Time
+                if (events[oldDate]) {
+                    const idx = events[oldDate].findIndex(e => e.id === id);
+                    if (idx !== -1) {
+                        const evt = events[oldDate].splice(idx, 1)[0];
+                        if (events[oldDate].length === 0) delete events[oldDate];
+
+                        if (!events[newDate]) events[newDate] = [];
+                        events[newDate].push(evt);
+                        save();
+                        renderCalendar();
+                    }
+                }
+            }
+        }
+
+        function moveSeries(coreTitle, currentStep, totalSteps, oldDateStr, newDateStr) {
+            const currentIdx = parseInt(currentStep);
+            const total = parseInt(totalSteps);
+
+            // Calculate Day Diff
+            const d1 = new Date(oldDateStr);
+            const d2 = new Date(newDateStr);
+            const diffTime = d2 - d1;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            let count = 0;
+
+            for (let i = 1; i <= total; i++) {
+                // Expected Old Date
+                let checkDate = new Date(d1);
+                checkDate.setDate(checkDate.getDate() - (currentIdx - i));
+
+                // Format YYYY-MM-DD
+                let cdKey = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+
+                // Expected Title
+                let searchTitle = `${coreTitle} (Day ${i}/${total})`;
+
+                if (events[cdKey]) {
+                    const foundIdx = events[cdKey].findIndex(e => e.title === searchTitle);
+                    if (foundIdx !== -1) {
+                        // Move it
+                        const evt = events[cdKey].splice(foundIdx, 1)[0];
+                        if (events[cdKey].length === 0) delete events[cdKey];
+
+                        // New Date for this item
+                        let targetDate = new Date(checkDate);
+                        targetDate.setDate(targetDate.getDate() + diffDays);
+                        let tdKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+
+                        if (!events[tdKey]) events[tdKey] = [];
+                        events[tdKey].push(evt);
+                        count++;
+                    }
+                }
+            }
+            save();
+            renderCalendar();
+            alert(`Moved ${count} days of the '${coreTitle}' series.`);
+        }
+
         function renderCalendar() {
             const y = currentDate.getFullYear(),
                 m = currentDate.getMonth();
@@ -1471,11 +1585,18 @@
         function createDay(day, y, m, other) {
             const cell = document.createElement('div');
             cell.className = 'day-cell' + (other ? ' other-month' : '');
+
+            // DROP ZONES
+            cell.ondragover = (e) => { e.preventDefault(); cell.style.background = '#f0f0f0'; };
+            cell.ondragleave = (e) => { cell.style.background = ''; };
+            const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            cell.ondrop = (e) => handleDrop(e, dk);
+
             const num = document.createElement('div');
             num.className = 'day-number';
             num.textContent = day;
             cell.appendChild(num);
-            const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
             const all = [...(events[dk] || []), ...getRepEvents(dk)];
 
             all.forEach(e => {
@@ -1485,6 +1606,19 @@
                 const el = document.createElement('div');
                 el.className = 'event-item' + (e.isRepeating ? ' repeating' : '');
                 el.style.backgroundColor = eventCategories[e.category]?.color || '#999';
+                el.draggable = true; // ENABLE DRAG
+
+                // DRAG START
+                el.ondragstart = (ev) => {
+                    ev.dataTransfer.setData("text/plain", JSON.stringify({
+                        id: e.id,
+                        oldDate: dk,
+                        title: e.title,
+                        isRepeating: e.isRepeating || false,
+                        repeatType: e.repeat
+                    }));
+                };
+
                 const ic = e.icon || eventCategories[e.category]?.icon || '';
                 if (ic) {
                     const sp = document.createElement('span');
@@ -1505,10 +1639,20 @@
                     el.appendChild(tt);
                 }
 
+                // CLICK (Edit) vs DOUBLE CLICK (Move)
                 el.onclick = ev => {
                     ev.stopPropagation();
-                    openEventModal(e.id, dk, e.isRepeating);
+                    if (clickTimer) clearTimeout(clickTimer);
+                    clickTimer = setTimeout(() => {
+                        openEventModal(e.id, dk, e.isRepeating);
+                    }, 250);
                 };
+                el.ondblclick = ev => {
+                    ev.stopPropagation();
+                    if (clickTimer) clearTimeout(clickTimer);
+                    promptMoveEvent(e.id, dk, e.isRepeating);
+                };
+
                 cell.appendChild(el);
             });
             if (!other) cell.onclick = () => openEventModal(null, dk);
