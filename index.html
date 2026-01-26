@@ -203,6 +203,43 @@
             /* Bring to front on hover */
         }
 
+        /* Month Dropdown Styles */
+        .month-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            min-width: 180px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            z-index: 1000;
+            padding: 5px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+        }
+
+        .month-option {
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .month-option:hover {
+            background: #f0f0f0;
+        }
+
+        .month-option.current {
+            font-weight: bold;
+            color: #667eea;
+            background: #f8f9fa;
+        }
+
         /* Tooltip Styles */
         .event-tooltip {
             visibility: hidden;
@@ -642,9 +679,14 @@
                 </div>
             </div>
             <div class="controls">
-                <div class="month-nav">
+                <div class="month-nav" style="position:relative; z-index:20;">
                     <button onclick="previousMonth()">← Previous</button>
-                    <h2 id="currentMonth"></h2>
+                    <div style="position:relative; display:inline-block;">
+                        <h2 id="currentMonth" onclick="toggleMonthDropdown()"
+                            style="cursor:pointer; user-select:none; margin:0 10px; display:inline-block;"
+                            title="Click to jump to month"></h2>
+                        <div id="monthDropdown" class="month-dropdown"></div>
+                    </div>
                     <button onclick="nextMonth()">Next →</button>
                 </div>
                 <button class="add-event-btn" onclick="openEventModal()">+ Add Event</button>
@@ -1555,10 +1597,13 @@
         function renderCalendar() {
             const y = currentDate.getFullYear(),
                 m = currentDate.getMonth();
-            document.getElementById('currentMonth').textContent = currentDate.toLocaleString('default', {
-                month: 'long',
-                year: 'numeric'
-            });
+
+            // Header with Dropdown Arrow
+            const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            document.getElementById('currentMonth').innerHTML = `${monthName} <span style="font-size:12px; vertical-align:middle; opacity:0.5;">▼</span>`;
+
+            renderMonthDropdown(); // Populate dropdown
+
             const first = new Date(y, m, 1),
                 last = new Date(y, m + 1, 0),
                 prev = new Date(y, m, 0),
@@ -1583,6 +1628,48 @@
                 grid.appendChild(createDay(d, y, m + 1, true));
             }
         }
+
+        // --- Month Navigation Logic ---
+        function renderMonthDropdown() {
+            const d = document.getElementById('monthDropdown');
+            d.innerHTML = '';
+            const year = currentDate.getFullYear();
+            for (let i = 0; i < 12; i++) {
+                const date = new Date(year, i, 1);
+                const mName = date.toLocaleString('default', { month: 'long' });
+                const item = document.createElement('div');
+                item.className = 'month-option';
+                if (i === currentDate.getMonth()) item.classList.add('current');
+                item.textContent = mName + ' ' + year;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    currentDate.setMonth(i);
+                    // Handle year boundary safety if moving Dec -> Jan etc, but here we set explicit month in current year context
+                    // Actually setMonth wraps years if > 11, but 'i' is 0-11, so it stays in year potentially?
+                    // Safe approach: set Full Year and Month
+                    currentDate.setFullYear(year);
+                    currentDate.setMonth(i);
+                    renderCalendar();
+                    toggleMonthDropdown();
+                };
+                d.appendChild(item);
+            }
+        }
+
+        function toggleMonthDropdown() {
+            const d = document.getElementById('monthDropdown');
+            if (d.style.display === 'block') d.style.display = 'none';
+            else d.style.display = 'block';
+        }
+
+        // Close dropdown when clicking elsewhere
+        window.addEventListener('click', (e) => {
+            const d = document.getElementById('monthDropdown');
+            const t = document.getElementById('currentMonth');
+            if (d.style.display === 'block' && e.target !== d && e.target !== t && !t.contains(e.target)) {
+                d.style.display = 'none';
+            }
+        });
 
         function createDay(day, y, m, other) {
             const cell = document.createElement('div');
