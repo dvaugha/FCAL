@@ -849,7 +849,9 @@
     <div class="modal" id="listDetailModal">
         <div class="modal-content">
             <h2 id="listDetailTitle">Edit List</h2>
-            <div class="form-group"><label>List Name</label><input type="text" id="listName" /></div>
+            <div class="form-group"><label>List Name</label><input type="text" id="listName"
+                    oninput="if(currentListId===null){document.getElementById('listDesc').value=this.value; document.getElementById('listEventTitle').value=this.value;}" />
+            </div>
             <div class="form-group"><label>Description</label><textarea id="listDesc"></textarea></div>
 
             <h3>Events in this List</h3>
