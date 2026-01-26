@@ -824,35 +824,48 @@
             if (!list) return;
             if (!confirm(`Apply "${list.name}" to your calendar? This will add ${list.events.length} events.`)) return;
 
+            let addCount = 0;
             list.events.forEach(e => {
-                // Determine start date. If the list item has a specific date, uses it. 
-                // If not, we might default to 'today' or ask user, but for simplicity here we assume 
-                // smart lists have dates or relative dates mapped to current year.
-                // For this V1, we assume events have set dates or are repeating.
+                let targetDate = e.startDate;
 
-                let targetDate = e.startDate || new Date().toISOString().split('T')[0];
+                // If it's a repeating event, add to repeatingEvents
+                if (e.repeat && e.repeat !== 'none') {
+                    const newRepEvent = {
+                        id: Date.now().toString() + Math.random().toString().substr(2, 5),
+                        title: e.title,
+                        time: e.time || '',
+                        description: e.description || '',
+                        category: Object.keys(eventCategories)[0],
+                        icon: e.icon || '',
+                        repeat: e.repeat,
+                        startDate: targetDate || new Date().toISOString().split('T')[0]
+                    };
+                    repeatingEvents.push(newRepEvent);
+                    addCount++;
+                } else {
+                    // One-time event
+                    if (!targetDate) {
+                        targetDate = new Date().toISOString().split('T')[0];
+                    }
 
-                const newEvent = {
-                    id: Date.now().toString() + Math.random().toString().substr(2, 5),
-                    title: e.title,
-                    time: e.time,
-                    description: e.description,
-                    category: Object.keys(eventCategories)[0], // Default category
-                    icon: e.icon || '',
-                    repeat: e.repeat || 'none',
-                    startDate: targetDate
-                };
+                    const newEvent = {
+                        id: Date.now().toString() + Math.random().toString().substr(2, 5),
+                        title: e.title,
+                        time: e.time || '',
+                        description: e.description || '',
+                        category: Object.keys(eventCategories)[0],
+                        icon: e.icon || '',
+                        repeat: 'none'
+                    };
 
-                if (newEvent.repeat === 'none') {
                     if (!events[targetDate]) events[targetDate] = [];
                     events[targetDate].push(newEvent);
-                } else {
-                    repeatingEvents.push(newEvent);
+                    addCount++;
                 }
             });
             save();
             renderCalendar();
-            alert('Events added successfully!');
+            alert(`Successfully added ${addCount} events to your calendar!`);
             closeListsModal();
         }
 
@@ -959,14 +972,28 @@
                 let hits = [];
                 // Simulated "Online" database
                 if (q.includes('school')) {
+                    // 2025-2026 (Current Academic Year)
                     hits.push({
                         name: 'Wake County Public Schools 2025-26',
-                        desc: 'Teacher workdays, Holidays, First/Last Day',
+                        desc: 'Current Year: Includes Spring 2026 dates',
                         events: [
                             { title: 'First Day of School', startDate: '2025-08-25', repeat: 'none', icon: '🏫' },
-                            { title: 'Labor Day (No School)', startDate: '2025-09-01', repeat: 'none', icon: '🚫' },
-                            { title: 'Teacher Workday', startDate: '2025-10-31', repeat: 'none', icon: '👩‍🏫' },
                             { title: 'Winter Break', startDate: '2025-12-20', repeat: 'none', icon: '❄️' },
+                            { title: 'MLK Day (No School)', startDate: '2026-01-19', repeat: 'none', icon: '✊' },
+                            { title: 'Spring Break', startDate: '2026-03-30', repeat: 'none', icon: '🌱' },
+                            { title: 'Last Day of School', startDate: '2026-06-12', repeat: 'none', icon: '🎉' }
+                        ]
+                    });
+
+                    // 2026-2027 (Next Academic Year)
+                    hits.push({
+                        name: 'Wake County Public Schools 2026-27',
+                        desc: 'Next Year: Fall 2026 dates',
+                        events: [
+                            { title: 'First Day of School', startDate: '2026-08-24', repeat: 'none', icon: '🏫' },
+                            { title: 'Labor Day (No School)', startDate: '2026-09-07', repeat: 'none', icon: '🚫' },
+                            { title: 'Teacher Workday', startDate: '2026-10-30', repeat: 'none', icon: '👩‍🏫' },
+                            { title: 'Winter Break', startDate: '2026-12-21', repeat: 'none', icon: '❄️' },
                         ]
                     });
                 }
