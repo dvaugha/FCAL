@@ -194,6 +194,55 @@
             align-items: flex-start;
             gap: 4px;
             line-height: 1.3;
+            position: relative;
+            /* For tooltip positioning */
+        }
+
+        .event-item:hover {
+            z-index: 10;
+            /* Bring to front on hover */
+        }
+
+        /* Tooltip Styles */
+        .event-tooltip {
+            visibility: hidden;
+            width: 220px;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 100;
+            bottom: 115%;
+            /* Position above */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s, bottom 0.2s;
+            font-size: 12px;
+            line-height: 1.4;
+            pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            white-space: normal;
+        }
+
+        .event-item:hover .event-tooltip {
+            visibility: visible;
+            opacity: 1;
+            bottom: 125%;
+            /* Slight animation up */
+        }
+
+        .event-tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -6px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: rgba(20, 20, 20, 0.95) transparent transparent transparent;
         }
 
         .event-item.repeating::after {
@@ -839,7 +888,7 @@
         let selectedRepeat = 'none';
         let selectedTaskRepeat = 'none';
 
-        const ICONS = ['🎉', '🎂', '💼', '📅', '✈️', '🏥', '🎓', '💪', '🍽️', '🎵', '📚', '💻', '🎨', '⚽', '🏀', '🤸', '🎮', '🎬', '📞', '✉️', '🏠', '🚗', '🎁', '❤️', '⭐', '🔔', '📝', '💡', '🔧', '🛒', '☕', '🌟', '🎯', '📊', '🧹', '🧺', '🧼', '🧽', '🧴', '🛁', '🧻', '🗑️', '🔨', '🪛', '🪚', '💰', '💵', '💳', '🧾', '🏦', '💲'];
+        const ICONS = ['🎉', '🎂', '💼', '📅', '✈️', '🏥', '🎓', '💪', '🍽️', '🎵', '📚', '💻', '🎨', '⚽', '🏀', '🤸', '🎮', '🎬', '📞', '✉️', '🏠', '🚗', '🎁', '❤️', '⭐', '🔔', '📝', '💡', '🔧', '🛒', '☕', '🌟', '🎯', '📊', '🧹', '🧺', '🧼', '🧽', '🧴', '🛁', '🧻', '🗑️', '🔨', '🪛', '🪚', '💰', '💵', '💳', '🧾', '🏦', '💲', '🤠', '🐎', '🐂', '🏇', '🌵', '👢'];
         const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e91e63', '#795548', '#ff5722', '#00bcd4', '#4caf50', '#ffc107', '#673ab7', '#009688', '#ff4081', '#8d6e63', '#f44336', '#2196f3', '#8bc34a', '#ffeb3b', '#9c27b0', '#00acc1', '#ec407a', '#a1887f'];
         const REPEAT = [{ value: 'none', label: 'No Repeat' }, { value: 'daily', label: 'Every Day' }, { value: 'weekly', label: 'Every Week' }, { value: 'biweekly', label: 'Every 2 Weeks' }, { value: 'monthly', label: 'Every Month' }, { value: 'yearly', label: 'Every Year' }];
 
@@ -1447,6 +1496,15 @@
                 let displayTime = e.time ? formatTime(e.time) : '';
                 txt.textContent = displayTime ? (displayTime + ' ' + e.title) : e.title;
                 el.appendChild(txt);
+
+                // TOOLTIP
+                if (e.description) {
+                    const tt = document.createElement('div');
+                    tt.className = 'event-tooltip';
+                    tt.textContent = e.description;
+                    el.appendChild(tt);
+                }
+
                 el.onclick = ev => {
                     ev.stopPropagation();
                     openEventModal(e.id, dk, e.isRepeating);
@@ -1506,21 +1564,31 @@
             });
         }
 
-        function renderIcons(id, sel, cb) {
+        function renderIcons(id, getSel, setSel) {
             const c = document.getElementById(id);
-            c.innerHTML = '';
-            ICONS.forEach(ic => {
-                const o = document.createElement('div');
-                o.className = 'icon-option';
-                if (ic === sel) o.classList.add('selected');
-                o.textContent = ic;
-                o.onclick = () => {
-                    c.querySelectorAll('.icon-option').forEach(e => e.classList.remove('selected'));
-                    o.classList.add('selected');
-                    cb(ic);
-                };
-                c.appendChild(o);
-            });
+            const render = () => {
+                const currentSel = getSel() || '';
+                c.innerHTML = '';
+                ICONS.forEach(ic => {
+                    const o = document.createElement('div');
+                    o.className = 'icon-option';
+                    if (currentSel.includes(ic)) o.classList.add('selected');
+                    o.textContent = ic;
+                    o.onclick = (e) => {
+                        let newSel = currentSel;
+                        if (e.shiftKey) {
+                            if (newSel.includes(ic)) newSel = newSel.replace(ic, '');
+                            else newSel += ic;
+                        } else {
+                            newSel = ic;
+                        }
+                        setSel(newSel);
+                        render();
+                    };
+                    c.appendChild(o);
+                });
+            };
+            render();
         }
 
         function renderColors(id, sel, cb) {
@@ -1581,7 +1649,7 @@
                 selectedEventIcon = '';
                 selectedRepeat = 'none';
             }
-            renderIcons('iconSelector', selectedEventIcon, ic => selectedEventIcon = ic);
+            renderIcons('iconSelector', () => selectedEventIcon, ic => selectedEventIcon = ic);
             renderRep('repeatOptions');
             m.style.display = 'flex';
         }
@@ -1733,7 +1801,7 @@
                 selectedTaskIcon = '';
                 selectedTaskRepeat = 'none';
             }
-            renderIcons('taskIconSelector', selectedTaskIcon, ic => selectedTaskIcon = ic);
+            renderIcons('taskIconSelector', () => selectedTaskIcon, ic => selectedTaskIcon = ic);
             renderRep('taskRepeatOptions');
             m.style.display = 'flex';
         }
@@ -1827,7 +1895,7 @@
             const m = document.getElementById('categoriesModal');
             document.getElementById('categoriesModalTitle').textContent = type === 'event' ? 'Manage Event Categories' : 'Manage Task Categories';
             renderCategoriesList();
-            renderIcons('categoryIconSelector', selectedCategoryIcon, ic => selectedCategoryIcon = ic);
+            renderIcons('categoryIconSelector', () => selectedCategoryIcon, ic => selectedCategoryIcon = ic);
             renderColors('colorGrid', selectedColor, c => selectedColor = c);
             m.style.display = 'flex';
         }
@@ -1866,7 +1934,7 @@
             document.getElementById('newCategoryName').value = '';
             selectedColor = '';
             selectedCategoryIcon = '';
-            renderIcons('categoryIconSelector', '', ic => selectedCategoryIcon = ic);
+            renderIcons('categoryIconSelector', () => selectedCategoryIcon, ic => selectedCategoryIcon = ic);
             renderColors('colorGrid', '', c => selectedColor = c);
             save();
             renderCategoriesList();
