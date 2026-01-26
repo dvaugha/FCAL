@@ -600,6 +600,14 @@
                 </div>
                 <button class="add-event-btn" onclick="openEventModal()">+ Add Event</button>
             </div>
+            <div
+                style="padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: #f8f9fa; border-bottom: 1px solid #ddd;">
+                <span style="font-weight:bold; color:#666;">Filter Events:</span>
+                <select id="eventFilter" onchange="filterCalendar()"
+                    style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                    <option value="all">Show All</option>
+                </select>
+            </div>
             <div class="calendar-grid" id="calendarGrid"></div>
         </div>
 
@@ -809,9 +817,10 @@
         let repeatingEvents = [];
         let tasks = [];
         let repeatingTasks = [];
-        let eventLists = []; // New structure for lists
+        let eventLists = [];
         let eventCategories = {};
         let taskCategories = {};
+        let currentEventFilter = 'all'; // New filter state
 
         // Draft variables for List Editing
         let currentListId = null;
@@ -902,7 +911,8 @@
             eventLists = JSON.parse(localStorage.getItem('eventLists') || '[]');
             eventCategories = JSON.parse(localStorage.getItem('eCats') || '{"personal":{"name":"Personal","color":"#3498db","icon":"👤"},"work":{"name":"Work","color":"#e74c3c","icon":"💼"}}');
             taskCategories = JSON.parse(localStorage.getItem('tCats') || '{"cleaning":{"name":"Cleaning","color":"#3498db","icon":"🧹"},"shopping":{"name":"Shopping","color":"#f39c12","icon":"🛒"}}');
-            updateSelects();
+            updateSelects(); // Updates modal selects
+            updateFilterDropdown(); // New: Updates calendar filter
             renderLists();
         }
 
@@ -1418,7 +1428,11 @@
             cell.appendChild(num);
             const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const all = [...(events[dk] || []), ...getRepEvents(dk)];
+
             all.forEach(e => {
+                // FILTER CHECK
+                if (currentEventFilter !== 'all' && e.category !== currentEventFilter) return;
+
                 const el = document.createElement('div');
                 el.className = 'event-item' + (e.isRepeating ? ' repeating' : '');
                 el.style.backgroundColor = eventCategories[e.category]?.color || '#999';
@@ -1441,6 +1455,27 @@
             });
             if (!other) cell.onclick = () => openEventModal(null, dk);
             return cell;
+        }
+
+        // --- Filter Logic ---
+        function updateFilterDropdown() {
+            const s = document.getElementById('eventFilter');
+            // Keep selected if possible
+            const oldVal = s.value;
+            s.innerHTML = '<option value="all">Show All</option>';
+            for (let k in eventCategories) {
+                const op = document.createElement('option');
+                op.value = k;
+                op.textContent = (eventCategories[k].icon || '') + ' ' + eventCategories[k].name;
+                s.appendChild(op);
+            }
+            if (eventCategories[oldVal] || oldVal === 'all') s.value = oldVal;
+            else s.value = 'all';
+        }
+
+        function filterCalendar() {
+            currentEventFilter = document.getElementById('eventFilter').value;
+            renderCalendar();
         }
 
         function previousMonth() {
@@ -1836,6 +1871,7 @@
             save();
             renderCategoriesList();
             updateSelects();
+            updateFilterDropdown(); // Refresh filter
         }
 
         function deleteCategory(k) {
@@ -1845,6 +1881,7 @@
             save();
             renderCategoriesList();
             updateSelects();
+            updateFilterDropdown(); // Refresh filter
         }
 
         function closeEditCategoryModal() {
