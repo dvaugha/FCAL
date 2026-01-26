@@ -594,71 +594,661 @@
     </div>
 
     <script>
-        let currentDate = new Date(), events = {}, repeatingEvents = [], tasks = [], repeatingTasks = [], eventCategories = {}, taskCategories = {}, editingEventId = null, editingTaskId = null, editingCategoryKey = null, currentCategoryType = 'event', selectedEventIcon = '', selectedTaskIcon = '', selectedCategoryIcon = '', selectedColor = '', selectedEditColor = '', selectedEditIcon = '', selectedRepeat = 'none', selectedTaskRepeat = 'none';
+
+        let currentDate = new Date();
+        let events = {};
+        let repeatingEvents = [];
+        let tasks = [];
+        let repeatingTasks = [];
+        let eventCategories = {};
+        let taskCategories = {};
+        let editingEventId = null;
+        let editingTaskId = null;
+        let editingCategoryKey = null;
+        let currentCategoryType = 'event';
+        let selectedEventIcon = '';
+        let selectedTaskIcon = '';
+        let selectedCategoryIcon = '';
+        let selectedColor = '';
+        let selectedEditColor = '';
+        let selectedEditIcon = '';
+        let selectedRepeat = 'none';
+        let selectedTaskRepeat = 'none';
+
         const ICONS = ['🎉', '🎂', '💼', '📅', '✈️', '🏥', '🎓', '💪', '🍽️', '🎵', '📚', '💻', '🎨', '⚽', '🏀', '🤸', '🎮', '🎬', '📞', '✉️', '🏠', '🚗', '🎁', '❤️', '⭐', '🔔', '📝', '💡', '🔧', '🛒', '☕', '🌟', '🎯', '📊', '🧹', '🧺', '🧼', '🧽', '🧴', '🛁', '🧻', '🗑️', '🔨', '🪛', '🪚'];
         const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e91e63', '#795548', '#ff5722', '#00bcd4', '#4caf50', '#ffc107', '#673ab7', '#009688', '#ff4081', '#8d6e63', '#f44336', '#2196f3', '#8bc34a', '#ffeb3b', '#9c27b0', '#00acc1', '#ec407a', '#a1887f'];
         const REPEAT = [{ value: 'none', label: 'No Repeat' }, { value: 'daily', label: 'Every Day' }, { value: 'weekly', label: 'Every Week' }, { value: 'biweekly', label: 'Every 2 Weeks' }, { value: 'monthly', label: 'Every Month' }, { value: 'yearly', label: 'Every Year' }];
 
-        function hash(p) { let h = 0; for (let i = 0; i < p.length; i++) { h = ((h << 5) - h) + p.charCodeAt(i); h &= h; } return h.toString(); }
-        function formatTime(t) { if (!t) return ''; let [h, m] = t.split(':'); h = parseInt(h); const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12; h = h ? h : 12; return `${h}:${m} ${ampm}`; }
-        function login() { const p = document.getElementById('passwordInput').value, e = document.getElementById('errorMessage'); if (!p) { e.textContent = 'Enter password'; return; } const h = hash(p), s = localStorage.getItem('cal_pw'); if (!s) { localStorage.setItem('cal_pw', h); init(); } else if (s === h) { init(); } else { e.textContent = 'Wrong password'; } }
-        function logout() { document.getElementById('loginContainer').style.display = 'block'; document.getElementById('mainContainer').style.display = 'none'; document.getElementById('passwordInput').value = ''; }
-        function init() { document.getElementById('loginContainer').style.display = 'none'; document.getElementById('mainContainer').style.display = 'block'; load(); renderCalendar(); renderTasks(); }
-        function load() { events = JSON.parse(localStorage.getItem('events') || '{}'); repeatingEvents = JSON.parse(localStorage.getItem('repEvents') || '[]'); tasks = JSON.parse(localStorage.getItem('tasks') || '[]'); repeatingTasks = JSON.parse(localStorage.getItem('repTasks') || '[]'); eventCategories = JSON.parse(localStorage.getItem('eCats') || '{"personal":{"name":"Personal","color":"#3498db","icon":"👤"},"work":{"name":"Work","color":"#e74c3c","icon":"💼"}}'); taskCategories = JSON.parse(localStorage.getItem('tCats') || '{"cleaning":{"name":"Cleaning","color":"#3498db","icon":"🧹"},"shopping":{"name":"Shopping","color":"#f39c12","icon":"🛒"}}'); updateSelects(); }
-        function save() { localStorage.setItem('events', JSON.stringify(events)); localStorage.setItem('repEvents', JSON.stringify(repeatingEvents)); localStorage.setItem('tasks', JSON.stringify(tasks)); localStorage.setItem('repTasks', JSON.stringify(repeatingTasks)); localStorage.setItem('eCats', JSON.stringify(eventCategories)); localStorage.setItem('tCats', JSON.stringify(taskCategories)); }
+        function hash(p) {
+            let h = 0;
+            for (let i = 0; i < p.length; i++) {
+                h = ((h << 5) - h) + p.charCodeAt(i);
+                h &= h;
+            }
+            return h.toString();
+        }
 
-        function getRepEvents(dk) { const d = new Date(dk), arr = []; repeatingEvents.forEach(e => { const ed = new Date(e.startDate); if (d < ed) return; let show = false; switch (e.repeat) { case 'daily': show = true; break; case 'weekly': show = d.getDay() === ed.getDay(); break; case 'biweekly': const diff = Math.floor((d - ed) / (864e5)); show = d.getDay() === ed.getDay() && diff % 14 === 0; break; case 'monthly': show = d.getDate() === ed.getDate(); break; case 'yearly': show = d.getDate() === ed.getDate() && d.getMonth() === ed.getMonth(); break; }if (show) arr.push({ ...e, isRepeating: true }); }); return arr; }
+        function formatTime(t) {
+            if (!t) return '';
+            try {
+                let parts = t.split(':');
+                if (parts.length < 2) return t;
+                let h = parseInt(parts[0]);
+                let m = parts[1];
+                if (isNaN(h)) return t;
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                h = h % 12;
+                h = h ? h : 12;
+                return h + ':' + m + ' ' + ampm;
+            } catch (e) {
+                console.error("Time format error", e);
+                return t;
+            }
+        }
 
-        function getRepTasks() { const t = new Date(), tk = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`, arr = []; repeatingTasks.forEach(task => { if (!task.startDate) return; const td = new Date(task.startDate), today = new Date(tk); if (today < td) return; let show = false; switch (task.repeat) { case 'daily': show = true; break; case 'weekly': show = today.getDay() === td.getDay(); break; case 'biweekly': const diff = Math.floor((today - td) / (864e5)); show = today.getDay() === td.getDay() && diff % 14 === 0; break; case 'monthly': show = today.getDate() === td.getDate(); break; case 'yearly': show = today.getDate() === td.getDate() && today.getMonth() === td.getMonth(); break; }if (show) { const done = task.completedDates && task.completedDates.includes(tk); arr.push({ ...task, isRepeating: true, completed: done, currentDate: tk }); } }); return arr; }
+        function login() {
+            const p = document.getElementById('passwordInput').value,
+                e = document.getElementById('errorMessage');
+            if (!p) {
+                e.textContent = 'Enter password';
+                return;
+            }
+            const h = hash(p),
+                s = localStorage.getItem('cal_pw');
+            if (!s) {
+                localStorage.setItem('cal_pw', h);
+                init();
+            } else if (s === h) {
+                init();
+            } else {
+                e.textContent = 'Wrong password';
+            }
+        }
 
-        function renderCalendar() { const y = currentDate.getFullYear(), m = currentDate.getMonth(); document.getElementById('currentMonth').textContent = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }); const first = new Date(y, m, 1), last = new Date(y, m + 1, 0), prev = new Date(y, m, 0), start = first.getDay(), total = last.getDate(), grid = document.getElementById('calendarGrid'); grid.innerHTML = '';['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => { const h = document.createElement('div'); h.className = 'day-header'; h.textContent = d; grid.appendChild(h); }); for (let i = start - 1; i >= 0; i--) { grid.appendChild(createDay(prev.getDate() - i, y, m - 1, true)); } for (let d = 1; d <= total; d++) { grid.appendChild(createDay(d, y, m, false)); } const rem = 42 - (start + total); for (let d = 1; d <= rem; d++) { grid.appendChild(createDay(d, y, m + 1, true)); } }
+        function logout() {
+            document.getElementById('loginContainer').style.display = 'block';
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
 
-        function createDay(day, y, m, other) { const cell = document.createElement('div'); cell.className = 'day-cell' + (other ? ' other-month' : ''); const num = document.createElement('div'); num.className = 'day-number'; num.textContent = day; cell.appendChild(num); const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const all = [...(events[dk] || []), ...getRepEvents(dk)]; all.forEach(e => { const el = document.createElement('div'); el.className = 'event-item' + (e.isRepeating ? ' repeating' : ''); el.style.backgroundColor = eventCategories[e.category]?.color || '#999'; const ic = e.icon || eventCategories[e.category]?.icon || ''; if (ic) { const sp = document.createElement('span'); sp.textContent = ic; el.appendChild(sp); } const txt = document.createElement('span'); txt.textContent = e.time ? `${formatTime(e.time)} ${e.title}` : e.title; el.appendChild(txt); el.onclick = ev => { ev.stopPropagation(); openEventModal(e.id, dk, e.isRepeating); }; cell.appendChild(el); }); if (!other) cell.onclick = () => openEventModal(null, dk); return cell; }
+        function init() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            load();
+            renderCalendar();
+            renderTasks();
+        }
 
-        function previousMonth() { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); }
-        function nextMonth() { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); }
+        function load() {
+            events = JSON.parse(localStorage.getItem('events') || '{}');
+            repeatingEvents = JSON.parse(localStorage.getItem('repEvents') || '[]');
+            tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+            repeatingTasks = JSON.parse(localStorage.getItem('repTasks') || '[]');
+            eventCategories = JSON.parse(localStorage.getItem('eCats') || '{"personal":{"name":"Personal","color":"#3498db","icon":"👤"},"work":{"name":"Work","color":"#e74c3c","icon":"💼"}}');
+            taskCategories = JSON.parse(localStorage.getItem('tCats') || '{"cleaning":{"name":"Cleaning","color":"#3498db","icon":"🧹"},"shopping":{"name":"Shopping","color":"#f39c12","icon":"🛒"}}');
+            updateSelects();
+        }
 
-        function renderRep(id) { const c = document.getElementById(id); c.innerHTML = ''; REPEAT.forEach(r => { const o = document.createElement('div'); o.className = 'repeat-option'; if (r.value === (id.includes('task') ? selectedTaskRepeat : selectedRepeat)) o.classList.add('selected'); o.textContent = r.label; o.onclick = () => { c.querySelectorAll('.repeat-option').forEach(e => e.classList.remove('selected')); o.classList.add('selected'); if (id.includes('task')) selectedTaskRepeat = r.value; else selectedRepeat = r.value; }; c.appendChild(o); }); }
+        function save() {
+            localStorage.setItem('events', JSON.stringify(events));
+            localStorage.setItem('repEvents', JSON.stringify(repeatingEvents));
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            localStorage.setItem('repTasks', JSON.stringify(repeatingTasks));
+            localStorage.setItem('eCats', JSON.stringify(eventCategories));
+            localStorage.setItem('tCats', JSON.stringify(taskCategories));
+        }
 
-        function renderIcons(id, sel, cb) { const c = document.getElementById(id); c.innerHTML = ''; ICONS.forEach(ic => { const o = document.createElement('div'); o.className = 'icon-option'; if (ic === sel) o.classList.add('selected'); o.textContent = ic; o.onclick = () => { c.querySelectorAll('.icon-option').forEach(e => e.classList.remove('selected')); o.classList.add('selected'); cb(ic); }; c.appendChild(o); }); }
+        function getRepEvents(dk) {
+            const d = new Date(dk),
+                arr = [];
+            repeatingEvents.forEach(e => {
+                const ed = new Date(e.startDate);
+                if (d < ed) return;
+                let show = false;
+                switch (e.repeat) {
+                    case 'daily':
+                        show = true;
+                        break;
+                    case 'weekly':
+                        show = d.getDay() === ed.getDay();
+                        break;
+                    case 'biweekly':
+                        const diff = Math.floor((d - ed) / (864e5));
+                        show = d.getDay() === ed.getDay() && diff % 14 === 0;
+                        break;
+                    case 'monthly':
+                        show = d.getDate() === ed.getDate();
+                        break;
+                    case 'yearly':
+                        show = d.getDate() === ed.getDate() && d.getMonth() === ed.getMonth();
+                        break;
+                }
+                if (show) arr.push({
+                    ...e,
+                    isRepeating: true
+                });
+            });
+            return arr;
+        }
 
-        function renderColors(id, sel, cb) { const c = document.getElementById(id); c.innerHTML = ''; COLORS.forEach(col => { const s = document.createElement('div'); s.className = 'color-swatch'; if (col === sel) s.classList.add('selected'); s.style.backgroundColor = col; s.onclick = () => { c.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('selected')); s.classList.add('selected'); cb(col); }; c.appendChild(s); }); }
+        function getRepTasks() {
+            const t = new Date(),
+                tk = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`,
+                arr = [];
+            repeatingTasks.forEach(task => {
+                if (!task.startDate) return;
+                const td = new Date(task.startDate),
+                    today = new Date(tk);
+                if (today < td) return;
+                let show = false;
+                switch (task.repeat) {
+                    case 'daily':
+                        show = true;
+                        break;
+                    case 'weekly':
+                        show = today.getDay() === td.getDay();
+                        break;
+                    case 'biweekly':
+                        const diff = Math.floor((today - td) / (864e5));
+                        show = today.getDay() === td.getDay() && diff % 14 === 0;
+                        break;
+                    case 'monthly':
+                        show = today.getDate() === td.getDate();
+                        break;
+                    case 'yearly':
+                        show = today.getDate() === td.getDate() && today.getMonth() === td.getMonth();
+                        break;
+                }
+                if (show) {
+                    const done = task.completedDates && task.completedDates.includes(tk);
+                    arr.push({
+                        ...task,
+                        isRepeating: true,
+                        completed: done,
+                        currentDate: tk
+                    });
+                }
+            });
+            return arr;
+        }
 
-        function openEventModal(id = null, dk = null, rep = false) { editingEventId = id; const m = document.getElementById('eventModal'), db = document.getElementById('deleteEventBtn'); if (id) { document.getElementById('modalTitle').textContent = 'Edit Event'; db.style.display = 'block'; let ev = null; if (rep) ev = repeatingEvents.find(e => e.id === id); else { for (let d in events) { ev = events[d].find(e => e.id === id); if (ev) { dk = d; break; } } } if (ev) { document.getElementById('eventTitle').value = ev.title; document.getElementById('eventDate').value = rep ? ev.startDate : dk; document.getElementById('eventTime').value = ev.time || ''; document.getElementById('eventDescription').value = ev.description || ''; document.getElementById('eventCategory').value = ev.category; selectedEventIcon = ev.icon || ''; selectedRepeat = ev.repeat || 'none'; } } else { document.getElementById('modalTitle').textContent = 'Add Event'; db.style.display = 'none'; document.getElementById('eventTitle').value = ''; document.getElementById('eventDate').value = dk || ''; document.getElementById('eventTime').value = ''; document.getElementById('eventDescription').value = ''; document.getElementById('eventCategory').value = Object.keys(eventCategories)[0]; selectedEventIcon = ''; selectedRepeat = 'none'; } renderIcons('iconSelector', selectedEventIcon, ic => selectedEventIcon = ic); renderRep('repeatOptions'); m.style.display = 'flex'; }
+        function renderCalendar() {
+            const y = currentDate.getFullYear(),
+                m = currentDate.getMonth();
+            document.getElementById('currentMonth').textContent = currentDate.toLocaleString('default', {
+                month: 'long',
+                year: 'numeric'
+            });
+            const first = new Date(y, m, 1),
+                last = new Date(y, m + 1, 0),
+                prev = new Date(y, m, 0),
+                start = first.getDay(),
+                total = last.getDate(),
+                grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => {
+                const h = document.createElement('div');
+                h.className = 'day-header';
+                h.textContent = d;
+                grid.appendChild(h);
+            });
+            for (let i = start - 1; i >= 0; i--) {
+                grid.appendChild(createDay(prev.getDate() - i, y, m - 1, true));
+            }
+            for (let d = 1; d <= total; d++) {
+                grid.appendChild(createDay(d, y, m, false));
+            }
+            const rem = 42 - (start + total);
+            for (let d = 1; d <= rem; d++) {
+                grid.appendChild(createDay(d, y, m + 1, true));
+            }
+        }
 
-        function closeEventModal() { document.getElementById('eventModal').style.display = 'none'; editingEventId = null; selectedEventIcon = ''; selectedRepeat = 'none'; }
+        function createDay(day, y, m, other) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell' + (other ? ' other-month' : '');
+            const num = document.createElement('div');
+            num.className = 'day-number';
+            num.textContent = day;
+            cell.appendChild(num);
+            const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const all = [...(events[dk] || []), ...getRepEvents(dk)];
+            all.forEach(e => {
+                const el = document.createElement('div');
+                el.className = 'event-item' + (e.isRepeating ? ' repeating' : '');
+                el.style.backgroundColor = eventCategories[e.category]?.color || '#999';
+                const ic = e.icon || eventCategories[e.category]?.icon || '';
+                if (ic) {
+                    const sp = document.createElement('span');
+                    sp.textContent = ic;
+                    el.appendChild(sp);
+                }
+                const txt = document.createElement('span');
+                // USE FORMAT TIME HERE
+                let displayTime = e.time ? formatTime(e.time) : '';
+                txt.textContent = displayTime ? (displayTime + ' ' + e.title) : e.title;
+                el.appendChild(txt);
+                el.onclick = ev => {
+                    ev.stopPropagation();
+                    openEventModal(e.id, dk, e.isRepeating);
+                };
+                cell.appendChild(el);
+            });
+            if (!other) cell.onclick = () => openEventModal(null, dk);
+            return cell;
+        }
 
-        function saveEvent() { const t = document.getElementById('eventTitle').value.trim(), d = document.getElementById('eventDate').value, tm = document.getElementById('eventTime').value, desc = document.getElementById('eventDescription').value.trim(), cat = document.getElementById('eventCategory').value; if (!t || !d) { alert('Enter title and date'); return; } if (editingEventId) { for (let dk in events) { const i = events[dk].findIndex(e => e.id === editingEventId); if (i !== -1) { events[dk].splice(i, 1); if (!events[dk].length) delete events[dk]; break; } } const ri = repeatingEvents.findIndex(e => e.id === editingEventId); if (ri !== -1) repeatingEvents.splice(ri, 1); } const ev = { id: editingEventId || Date.now().toString(), title: t, time: tm, description: desc, category: cat, icon: selectedEventIcon, repeat: selectedRepeat }; if (selectedRepeat === 'none') { if (!events[d]) events[d] = []; events[d].push(ev); } else { ev.startDate = d; repeatingEvents.push(ev); } save(); renderCalendar(); closeEventModal(); }
+        function previousMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
 
-        function deleteEvent() { if (!confirm('Delete event?')) return; for (let dk in events) { const i = events[dk].findIndex(e => e.id === editingEventId); if (i !== -1) { events[dk].splice(i, 1); if (!events[dk].length) delete events[dk]; break; } } const ri = repeatingEvents.findIndex(e => e.id === editingEventId); if (ri !== -1) repeatingEvents.splice(ri, 1); save(); renderCalendar(); closeEventModal(); }
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
 
-        function renderTasks() { const c = document.getElementById('tasksContent'); c.innerHTML = ''; const all = [...tasks, ...getRepTasks()]; if (!all.length) { c.innerHTML = '<p style="text-align:center;color:#999;padding:40px">No tasks</p>'; return; } const act = all.filter(t => !t.completed), done = all.filter(t => t.completed);[...act, ...done].forEach(t => { const el = document.createElement('div'); el.className = 'task-item'; const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'task-checkbox'; cb.checked = t.completed; cb.onchange = () => toggleTask(t.id, t.isRepeating, t.currentDate); const ic = document.createElement('span'); ic.className = 'task-icon'; ic.textContent = t.icon || taskCategories[t.category]?.icon || '📝'; const det = document.createElement('div'); det.className = 'task-details'; const tit = document.createElement('div'); tit.className = 'task-title' + (t.completed ? ' completed' : ''); tit.textContent = t.title + (t.isRepeating ? ' 🔁' : ''); const cat = document.createElement('div'); cat.className = 'task-category'; cat.textContent = taskCategories[t.category]?.name || 'Other'; cat.style.color = taskCategories[t.category]?.color || '#999'; det.appendChild(tit); det.appendChild(cat); const acts = document.createElement('div'); acts.className = 'task-actions'; const eb = document.createElement('button'); eb.textContent = 'Edit'; eb.style.background = '#3498db'; eb.style.color = 'white'; eb.onclick = () => openTaskModal(t.id, t.isRepeating); const db = document.createElement('button'); db.textContent = 'Delete'; db.style.background = '#e74c3c'; db.style.color = 'white'; db.onclick = () => deleteTask(t.id, t.isRepeating); acts.appendChild(eb); acts.appendChild(db); el.appendChild(cb); el.appendChild(ic); el.appendChild(det); el.appendChild(acts); c.appendChild(el); }); }
+        function renderRep(id) {
+            const c = document.getElementById(id);
+            c.innerHTML = '';
+            REPEAT.forEach(r => {
+                const o = document.createElement('div');
+                o.className = 'repeat-option';
+                if (r.value === (id.includes('task') ? selectedTaskRepeat : selectedRepeat)) o.classList.add('selected');
+                o.textContent = r.label;
+                o.onclick = () => {
+                    c.querySelectorAll('.repeat-option').forEach(e => e.classList.remove('selected'));
+                    o.classList.add('selected');
+                    if (id.includes('task')) selectedTaskRepeat = r.value;
+                    else selectedRepeat = r.value;
+                };
+                c.appendChild(o);
+            });
+        }
 
-        function openTaskModal(id = null, rep = false) { editingTaskId = id; const m = document.getElementById('taskModal'), db = document.getElementById('deleteTaskBtn'); if (id) { document.getElementById('taskModalTitle').textContent = 'Edit Task'; db.style.display = 'block'; let t = null; if (rep) t = repeatingTasks.find(tk => tk.id === id); else t = tasks.find(tk => tk.id === id); if (t) { document.getElementById('taskTitle').value = t.title; document.getElementById('taskDescription').value = t.description || ''; document.getElementById('taskCategory').value = t.category; selectedTaskIcon = t.icon || ''; selectedTaskRepeat = t.repeat || 'none'; } } else { document.getElementById('taskModalTitle').textContent = 'Add Task'; db.style.display = 'none'; document.getElementById('taskTitle').value = ''; document.getElementById('taskDescription').value = ''; document.getElementById('taskCategory').value = Object.keys(taskCategories)[0]; selectedTaskIcon = ''; selectedTaskRepeat = 'none'; } renderIcons('taskIconSelector', selectedTaskIcon, ic => selectedTaskIcon = ic); renderRep('taskRepeatOptions'); m.style.display = 'flex'; }
+        function renderIcons(id, sel, cb) {
+            const c = document.getElementById(id);
+            c.innerHTML = '';
+            ICONS.forEach(ic => {
+                const o = document.createElement('div');
+                o.className = 'icon-option';
+                if (ic === sel) o.classList.add('selected');
+                o.textContent = ic;
+                o.onclick = () => {
+                    c.querySelectorAll('.icon-option').forEach(e => e.classList.remove('selected'));
+                    o.classList.add('selected');
+                    cb(ic);
+                };
+                c.appendChild(o);
+            });
+        }
 
-        function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; editingTaskId = null; selectedTaskIcon = ''; selectedTaskRepeat = 'none'; }
+        function renderColors(id, sel, cb) {
+            const c = document.getElementById(id);
+            c.innerHTML = '';
+            COLORS.forEach(col => {
+                const s = document.createElement('div');
+                s.className = 'color-swatch';
+                if (col === sel) s.classList.add('selected');
+                s.style.backgroundColor = col;
+                s.onclick = () => {
+                    c.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('selected'));
+                    s.classList.add('selected');
+                    cb(col);
+                };
+                c.appendChild(s);
+            });
+        }
 
-        function saveTask() { const t = document.getElementById('taskTitle').value.trim(), desc = document.getElementById('taskDescription').value.trim(), cat = document.getElementById('taskCategory').value; if (!t) { alert('Enter title'); return; } if (editingTaskId) { const i = tasks.findIndex(tk => tk.id === editingTaskId); if (i !== -1) tasks.splice(i, 1); const ri = repeatingTasks.findIndex(tk => tk.id === editingTaskId); if (ri !== -1) repeatingTasks.splice(ri, 1); } const tk = { id: editingTaskId || Date.now().toString(), title: t, description: desc, category: cat, icon: selectedTaskIcon, repeat: selectedTaskRepeat, completed: false, startDate: new Date().toISOString().split('T')[0] }; if (selectedTaskRepeat === 'none') tasks.push(tk); else repeatingTasks.push(tk); save(); renderTasks(); closeTaskModal(); }
+        function openEventModal(id = null, dk = null, rep = false) {
+            editingEventId = id;
+            const m = document.getElementById('eventModal'),
+                db = document.getElementById('deleteEventBtn');
+            if (id) {
+                document.getElementById('modalTitle').textContent = 'Edit Event';
+                db.style.display = 'block';
+                let ev = null;
+                if (rep) ev = repeatingEvents.find(e => e.id === id);
+                else {
+                    for (let d in events) {
+                        ev = events[d].find(e => e.id === id);
+                        if (ev) {
+                            dk = d;
+                            break;
+                        }
+                    }
+                }
+                if (ev) {
+                    document.getElementById('eventTitle').value = ev.title;
+                    // For the input type="date", we must use YYYY-MM-DD
+                    document.getElementById('eventDate').value = rep ? ev.startDate : dk;
+                    // For input type="time", we MUST use military time (HH:MM). 
+                    // HTML5 time inputs do not accept 12-hour format values.
+                    document.getElementById('eventTime').value = ev.time || '';
+                    document.getElementById('eventDescription').value = ev.description || '';
+                    document.getElementById('eventCategory').value = ev.category;
+                    selectedEventIcon = ev.icon || '';
+                    selectedRepeat = ev.repeat || 'none';
+                }
+            } else {
+                document.getElementById('modalTitle').textContent = 'Add Event';
+                db.style.display = 'none';
+                document.getElementById('eventTitle').value = '';
+                document.getElementById('eventDate').value = dk || '';
+                document.getElementById('eventTime').value = '';
+                document.getElementById('eventDescription').value = '';
+                document.getElementById('eventCategory').value = Object.keys(eventCategories)[0];
+                selectedEventIcon = '';
+                selectedRepeat = 'none';
+            }
+            renderIcons('iconSelector', selectedEventIcon, ic => selectedEventIcon = ic);
+            renderRep('repeatOptions');
+            m.style.display = 'flex';
+        }
 
-        function deleteTask() { if (!confirm('Delete task?')) return; const i = tasks.findIndex(tk => tk.id === editingTaskId); if (i !== -1) tasks.splice(i, 1); const ri = repeatingTasks.findIndex(tk => tk.id === editingTaskId); if (ri !== -1) repeatingTasks.splice(ri, 1); save(); renderTasks(); closeTaskModal(); }
+        function closeEventModal() {
+            document.getElementById('eventModal').style.display = 'none';
+            editingEventId = null;
+            selectedEventIcon = '';
+            selectedRepeat = 'none';
+        }
 
-        function toggleTask(id, rep, curDate) { if (rep) { const t = repeatingTasks.find(tk => tk.id === id); if (t) { if (!t.completedDates) t.completedDates = []; if (t.completedDates.includes(curDate)) t.completedDates = t.completedDates.filter(d => d !== curDate); else t.completedDates.push(curDate); } } else { const t = tasks.find(tk => tk.id === id); if (t) t.completed = !t.completed; } save(); renderTasks(); }
+        function saveEvent() {
+            const t = document.getElementById('eventTitle').value.trim(),
+                d = document.getElementById('eventDate').value,
+                tm = document.getElementById('eventTime').value,
+                desc = document.getElementById('eventDescription').value.trim(),
+                cat = document.getElementById('eventCategory').value;
+            if (!t || !d) {
+                alert('Enter title and date');
+                return;
+            }
+            if (editingEventId) {
+                for (let dk in events) {
+                    const i = events[dk].findIndex(e => e.id === editingEventId);
+                    if (i !== -1) {
+                        events[dk].splice(i, 1);
+                        if (!events[dk].length) delete events[dk];
+                        break;
+                    }
+                }
+                const ri = repeatingEvents.findIndex(e => e.id === editingEventId);
+                if (ri !== -1) repeatingEvents.splice(ri, 1);
+            }
+            const ev = {
+                id: editingEventId || Date.now().toString(),
+                title: t,
+                time: tm,
+                description: desc,
+                category: cat,
+                icon: selectedEventIcon,
+                repeat: selectedRepeat
+            };
+            if (selectedRepeat === 'none') {
+                if (!events[d]) events[d] = [];
+                events[d].push(ev);
+            } else {
+                ev.startDate = d;
+                repeatingEvents.push(ev);
+            }
+            save();
+            renderCalendar();
+            closeEventModal();
+        }
 
-        function updateSelects() { const ec = document.getElementById('eventCategory'), tc = document.getElementById('taskCategory'); ec.innerHTML = ''; tc.innerHTML = ''; for (let k in eventCategories) { const op = document.createElement('option'); op.value = k; op.textContent = eventCategories[k].name; ec.appendChild(op); } for (let k in taskCategories) { const op = document.createElement('option'); op.value = k; op.textContent = taskCategories[k].name; tc.appendChild(op); } }
+        function deleteEvent() {
+            if (!confirm('Delete event?')) return;
+            for (let dk in events) {
+                const i = events[dk].findIndex(e => e.id === editingEventId);
+                if (i !== -1) {
+                    events[dk].splice(i, 1);
+                    if (!events[dk].length) delete events[dk];
+                    break;
+                }
+            }
+            const ri = repeatingEvents.findIndex(e => e.id === editingEventId);
+            if (ri !== -1) repeatingEvents.splice(ri, 1);
+            save();
+            renderCalendar();
+            closeEventModal();
+        }
 
-        function openCategoriesModal(type) { currentCategoryType = type; const m = document.getElementById('categoriesModal'); document.getElementById('categoriesModalTitle').textContent = type === 'event' ? 'Manage Event Categories' : 'Manage Task Categories'; renderCategoriesList(); renderIcons('categoryIconSelector', selectedCategoryIcon, ic => selectedCategoryIcon = ic); renderColors('colorGrid', selectedColor, c => selectedColor = c); m.style.display = 'flex'; }
+        function renderTasks() {
+            const c = document.getElementById('tasksContent');
+            c.innerHTML = '';
+            const all = [...tasks, ...getRepTasks()];
+            if (!all.length) {
+                c.innerHTML = '<p style="text-align:center;color:#999;padding:40px">No tasks</p>';
+                return;
+            }
+            const act = all.filter(t => !t.completed),
+                done = all.filter(t => t.completed);
+            [...act, ...done].forEach(t => {
+                const el = document.createElement('div');
+                el.className = 'task-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'task-checkbox';
+                cb.checked = t.completed;
+                cb.onchange = () => toggleTask(t.id, t.isRepeating, t.currentDate);
+                const ic = document.createElement('span');
+                ic.className = 'task-icon';
+                ic.textContent = t.icon || taskCategories[t.category]?.icon || '📝';
+                const det = document.createElement('div');
+                det.className = 'task-details';
+                const tit = document.createElement('div');
+                tit.className = 'task-title' + (t.completed ? ' completed' : '');
+                tit.textContent = t.title + (t.isRepeating ? ' 🔁' : '');
+                const cat = document.createElement('div');
+                cat.className = 'task-category';
+                cat.textContent = taskCategories[t.category]?.name || 'Other';
+                cat.style.color = taskCategories[t.category]?.color || '#999';
+                det.appendChild(tit);
+                det.appendChild(cat);
+                const acts = document.createElement('div');
+                acts.className = 'task-actions';
+                const eb = document.createElement('button');
+                eb.textContent = 'Edit';
+                eb.style.background = '#3498db';
+                eb.style.color = 'white';
+                eb.onclick = () => openTaskModal(t.id, t.isRepeating);
+                const db = document.createElement('button');
+                db.textContent = 'Delete';
+                db.style.background = '#e74c3c';
+                db.style.color = 'white';
+                db.onclick = () => deleteTask(t.id, t.isRepeating);
+                acts.appendChild(eb);
+                acts.appendChild(db);
+                el.appendChild(cb);
+                el.appendChild(ic);
+                el.appendChild(det);
+                el.appendChild(acts);
+                c.appendChild(el);
+            });
+        }
 
-        function closeCategoriesModal() { document.getElementById('categoriesModal').style.display = 'none'; }
+        function openTaskModal(id = null, rep = false) {
+            editingTaskId = id;
+            const m = document.getElementById('taskModal'),
+                db = document.getElementById('deleteTaskBtn');
+            if (id) {
+                document.getElementById('taskModalTitle').textContent = 'Edit Task';
+                db.style.display = 'block';
+                let t = null;
+                if (rep) t = repeatingTasks.find(tk => tk.id === id);
+                else t = tasks.find(tk => tk.id === id);
+                if (t) {
+                    document.getElementById('taskTitle').value = t.title;
+                    document.getElementById('taskDescription').value = t.description || '';
+                    document.getElementById('taskCategory').value = t.category;
+                    selectedTaskIcon = t.icon || '';
+                    selectedTaskRepeat = t.repeat || 'none';
+                }
+            } else {
+                document.getElementById('taskModalTitle').textContent = 'Add Task';
+                db.style.display = 'none';
+                document.getElementById('taskTitle').value = '';
+                document.getElementById('taskDescription').value = '';
+                document.getElementById('taskCategory').value = Object.keys(taskCategories)[0];
+                selectedTaskIcon = '';
+                selectedTaskRepeat = 'none';
+            }
+            renderIcons('taskIconSelector', selectedTaskIcon, ic => selectedTaskIcon = ic);
+            renderRep('taskRepeatOptions');
+            m.style.display = 'flex';
+        }
 
-        function renderCategoriesList() { const l = document.getElementById('categoriesList'); l.innerHTML = ''; const cats = currentCategoryType === 'event' ? eventCategories : taskCategories; for (let k in cats) { const c = cats[k]; const d = document.createElement('div'); d.className = 'category-item'; d.innerHTML = `<div class="category-color" style="background:${c.color}"></div><div class="category-info"><div class="category-name">${c.icon || ''} ${c.name}</div></div><div class="category-actions"><button class="remove-category" onclick="deleteCategory('${k}')">Remove</button></div>`; l.appendChild(d); } }
+        function closeTaskModal() {
+            document.getElementById('taskModal').style.display = 'none';
+            editingTaskId = null;
+            selectedTaskIcon = '';
+            selectedTaskRepeat = 'none';
+        }
 
-        function addCategory() { const n = document.getElementById('newCategoryName').value.trim(); if (!n || !selectedColor) { alert('Name and color required'); return; } const k = n.toLowerCase().replace(/\s+/g, '_'); const nc = { name: n, color: selectedColor, icon: selectedCategoryIcon || '' }; if (currentCategoryType === 'event') eventCategories[k] = nc; else taskCategories[k] = nc; document.getElementById('newCategoryName').value = ''; selectedColor = ''; selectedCategoryIcon = ''; renderIcons('categoryIconSelector', '', ic => selectedCategoryIcon = ic); renderColors('colorGrid', '', c => selectedColor = c); save(); renderCategoriesList(); updateSelects(); }
+        function saveTask() {
+            const t = document.getElementById('taskTitle').value.trim(),
+                desc = document.getElementById('taskDescription').value.trim(),
+                cat = document.getElementById('taskCategory').value;
+            if (!t) {
+                alert('Enter title');
+                return;
+            }
+            if (editingTaskId) {
+                const i = tasks.findIndex(tk => tk.id === editingTaskId);
+                if (i !== -1) tasks.splice(i, 1);
+                const ri = repeatingTasks.findIndex(tk => tk.id === editingTaskId);
+                if (ri !== -1) repeatingTasks.splice(ri, 1);
+            }
+            const tk = {
+                id: editingTaskId || Date.now().toString(),
+                title: t,
+                description: desc,
+                category: cat,
+                icon: selectedTaskIcon,
+                repeat: selectedTaskRepeat,
+                completed: false,
+                startDate: new Date().toISOString().split('T')[0]
+            };
+            if (selectedTaskRepeat === 'none') tasks.push(tk);
+            else repeatingTasks.push(tk);
+            save();
+            renderTasks();
+            closeTaskModal();
+        }
 
-        function deleteCategory(k) { if (!confirm('Delete category?')) return; if (currentCategoryType === 'event') delete eventCategories[k]; else delete taskCategories[k]; save(); renderCategoriesList(); updateSelects(); }
+        function deleteTask() {
+            if (!confirm('Delete task?')) return;
+            const i = tasks.findIndex(tk => tk.id === editingTaskId);
+            if (i !== -1) tasks.splice(i, 1);
+            const ri = repeatingTasks.findIndex(tk => tk.id === editingTaskId);
+            if (ri !== -1) repeatingTasks.splice(ri, 1);
+            save();
+            renderTasks();
+            closeTaskModal();
+        }
 
-        function closeEditCategoryModal() { document.getElementById('editCategoryModal').style.display = 'none'; }
-        function saveEditedCategory() { closeEditCategoryModal(); }
+        function toggleTask(id, rep, curDate) {
+            if (rep) {
+                const t = repeatingTasks.find(tk => tk.id === id);
+                if (t) {
+                    if (!t.completedDates) t.completedDates = [];
+                    if (t.completedDates.includes(curDate)) t.completedDates = t.completedDates.filter(d => d !== curDate);
+                    else t.completedDates.push(curDate);
+                }
+            } else {
+                const t = tasks.find(tk => tk.id === id);
+                if (t) t.completed = !t.completed;
+            }
+            save();
+            renderTasks();
+        }
 
+        function updateSelects() {
+            const ec = document.getElementById('eventCategory'),
+                tc = document.getElementById('taskCategory');
+            ec.innerHTML = '';
+            tc.innerHTML = '';
+            for (let k in eventCategories) {
+                const op = document.createElement('option');
+                op.value = k;
+                op.textContent = eventCategories[k].name;
+                ec.appendChild(op);
+            }
+            for (let k in taskCategories) {
+                const op = document.createElement('option');
+                op.value = k;
+                op.textContent = taskCategories[k].name;
+                tc.appendChild(op);
+            }
+        }
+
+        function openCategoriesModal(type) {
+            currentCategoryType = type;
+            const m = document.getElementById('categoriesModal');
+            document.getElementById('categoriesModalTitle').textContent = type === 'event' ? 'Manage Event Categories' : 'Manage Task Categories';
+            renderCategoriesList();
+            renderIcons('categoryIconSelector', selectedCategoryIcon, ic => selectedCategoryIcon = ic);
+            renderColors('colorGrid', selectedColor, c => selectedColor = c);
+            m.style.display = 'flex';
+        }
+
+        function closeCategoriesModal() {
+            document.getElementById('categoriesModal').style.display = 'none';
+        }
+
+        function renderCategoriesList() {
+            const l = document.getElementById('categoriesList');
+            l.innerHTML = '';
+            const cats = currentCategoryType === 'event' ? eventCategories : taskCategories;
+            for (let k in cats) {
+                const c = cats[k];
+                const d = document.createElement('div');
+                d.className = 'category-item';
+                d.innerHTML = `<div class="category-color" style="background:${c.color}"></div><div class="category-info"><div class="category-name">${c.icon || ''} ${c.name}</div></div><div class="category-actions"><button class="remove-category" onclick="deleteCategory('${k}')">Remove</button></div>`;
+                l.appendChild(d);
+            }
+        }
+
+        function addCategory() {
+            const n = document.getElementById('newCategoryName').value.trim();
+            if (!n || !selectedColor) {
+                alert('Name and color required');
+                return;
+            }
+            const k = n.toLowerCase().replace(/\s+/g, '_');
+            const nc = {
+                name: n,
+                color: selectedColor,
+                icon: selectedCategoryIcon || ''
+            };
+            if (currentCategoryType === 'event') eventCategories[k] = nc;
+            else taskCategories[k] = nc;
+            document.getElementById('newCategoryName').value = '';
+            selectedColor = '';
+            selectedCategoryIcon = '';
+            renderIcons('categoryIconSelector', '', ic => selectedCategoryIcon = ic);
+            renderColors('colorGrid', '', c => selectedColor = c);
+            save();
+            renderCategoriesList();
+            updateSelects();
+        }
+
+        function deleteCategory(k) {
+            if (!confirm('Delete category?')) return;
+            if (currentCategoryType === 'event') delete eventCategories[k];
+            else delete taskCategories[k];
+            save();
+            renderCategoriesList();
+            updateSelects();
+        }
+
+        function closeEditCategoryModal() {
+            document.getElementById('editCategoryModal').style.display = 'none';
+        }
+
+        function saveEditedCategory() {
+            closeEditCategoryModal();
+        }
     </script>
 </body>
 
