@@ -240,6 +240,27 @@
             background: #f8f9fa;
         }
 
+        /* List Draft Item Styles */
+        .list-item-draft {
+            position: relative;
+            background: white;
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .list-item-draft:hover .event-tooltip {
+            visibility: visible;
+            opacity: 1;
+            bottom: 110%;
+            z-index: 999;
+        }
+
         /* Tooltip Styles */
         .event-tooltip {
             visibility: hidden;
@@ -1309,7 +1330,7 @@
             }
             draftListEvents.forEach((e, idx) => {
                 const d = document.createElement('div');
-                d.style.cssText = "background:white; margin:5px 0; padding:8px; border-radius:4px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center; cursor:pointer;";
+                d.className = 'list-item-draft';
 
                 // Construct Hover String
                 let hoverText = `${e.title}`;
@@ -1321,7 +1342,12 @@
                     if (e.startDate) hoverText += ` on ${e.startDate}`;
                     if (e.time) hoverText += ` at ${formatTime(e.time)}`;
                 }
-                d.title = hoverText;
+
+                // create tooltip
+                const tt = document.createElement('div');
+                tt.className = 'event-tooltip';
+                tt.textContent = hoverText;
+                d.appendChild(tt);
 
                 d.onclick = () => {
                     // EDIT MODE: Populate fields
@@ -1338,7 +1364,20 @@
                     }
                 };
 
-                d.innerHTML = `<span>${e.title} <small style='color:#666'>(${e.repeat})</small></span> <button onclick="event.stopPropagation(); draftListEvents.splice(${idx},1);renderDraftEvents()" style="color:red;border:none;background:none;cursor:pointer;font-weight:bold;">X</button>`;
+                const contentSpan = document.createElement('span');
+                contentSpan.innerHTML = `${e.title} <small style='color:#666'>(${e.repeat})</small>`;
+                d.appendChild(contentSpan);
+
+                const delBtn = document.createElement('button');
+                delBtn.onclick = (evt) => {
+                    evt.stopPropagation();
+                    draftListEvents.splice(idx, 1);
+                    renderDraftEvents();
+                };
+                delBtn.style.cssText = "color:red;border:none;background:none;cursor:pointer;font-weight:bold;";
+                delBtn.textContent = 'X';
+                d.appendChild(delBtn);
+
                 c.appendChild(d);
             });
         }
