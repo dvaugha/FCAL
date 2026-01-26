@@ -1861,17 +1861,58 @@
                 txt.textContent = displayTime ? (displayTime + ' ' + e.title) : e.title;
                 el.appendChild(txt);
 
-                // TOOLTIP
-                if (e.description) {
-                    const tt = document.createElement('div');
-                    tt.className = 'event-tooltip';
-                    tt.textContent = e.description;
-                    el.appendChild(tt);
+                // --- GLOBAL TOOLTIP HOVER LOGIC ---
+                // Construct Rich Tooltip Content
+                let hoverContent = `<div style="text-align:left;">`;
+                if (ic) hoverContent += `<span style="font-size:1.2em; margin-right:5px;">${ic}</span>`;
+                hoverContent += `<strong>${e.title}</strong></div>`;
+
+                if (displayTime) hoverContent += `<div style="text-align:left; font-size:0.9em;">🕓 ${displayTime}</div>`;
+                if (e.category && eventCategories[e.category]) {
+                    hoverContent += `<div style="text-align:left; font-size:0.8em; color:#ccc;">📁 ${eventCategories[e.category].name}</div>`;
                 }
+                if (e.isRepeating) {
+                    hoverContent += `<div style="text-align:left; font-size:0.8em; color:#aaf;">🔁 ${e.repeat.charAt(0).toUpperCase() + e.repeat.slice(1)}</div>`;
+                }
+                if (e.description) {
+                    hoverContent += `<div style="text-align:left; margin-top:5px; font-style:italic; border-top:1px solid #555; padding-top:2px;">${e.description}</div>`;
+                }
+
+                el.onmouseenter = () => {
+                    const gt = document.getElementById('globalTooltip');
+                    if (gt) {
+                        gt.innerHTML = hoverContent;
+                        gt.style.visibility = 'visible';
+                        gt.style.opacity = '1';
+                        // Ensure it's on top of everything
+                        gt.style.zIndex = '999999';
+                    }
+                };
+                el.onmousemove = (ev) => {
+                    const gt = document.getElementById('globalTooltip');
+                    if (gt) {
+                        gt.style.left = (ev.clientX + 15) + 'px';
+                        gt.style.top = (ev.clientY + 15) + 'px';
+                    }
+                };
+                el.onmouseleave = () => {
+                    const gt = document.getElementById('globalTooltip');
+                    if (gt) {
+                        gt.style.visibility = 'hidden';
+                        gt.style.opacity = '0';
+                    }
+                };
 
                 // CLICK (Edit) vs DOUBLE CLICK (Move)
                 el.onclick = ev => {
                     ev.stopPropagation();
+                    // Hide tooltip clearly on click
+                    const gt = document.getElementById('globalTooltip');
+                    if (gt) {
+                        gt.style.visibility = 'hidden';
+                        gt.style.opacity = '0';
+                    }
+
                     if (clickTimer) clearTimeout(clickTimer);
                     clickTimer = setTimeout(() => {
                         openEventModal(e.id, dk, e.isRepeating);
@@ -1879,6 +1920,13 @@
                 };
                 el.ondblclick = ev => {
                     ev.stopPropagation();
+                    // Hide tooltip
+                    const gt = document.getElementById('globalTooltip');
+                    if (gt) {
+                        gt.style.visibility = 'hidden';
+                        gt.style.opacity = '0';
+                    }
+
                     if (clickTimer) clearTimeout(clickTimer);
                     promptMoveEvent(e.id, dk, e.isRepeating);
                 };
