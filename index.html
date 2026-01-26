@@ -936,7 +936,8 @@
     </div>
 
     <div id="globalTooltip" class="event-tooltip"
-        style="position:fixed; z-index:2147483647; pointer-events:none; transition:opacity 0.1s;"></div>
+        style="position:fixed; z-index:2147483647; pointer-events:none; transition:opacity 0.1s; bottom:auto; top:0; left:0; transform:none; width:auto; max-width:300px;">
+    </div>
     <script>
 
         let currentDate = new Date();
@@ -1353,6 +1354,10 @@
                 } else {
                     if (e.startDate) hoverHTML += `<div style="text-align:left;">Date: ${e.startDate}</div>`;
                     if (e.time) hoverHTML += `<div style="text-align:left;">Time: ${formatTime(e.time)}</div>`;
+                }
+
+                if (e.description) {
+                    hoverHTML += `<div style="text-align:left; margin-top:5px; font-style:italic; border-top:1px solid #555; padding-top:2px;">${e.description}</div>`;
                 }
 
                 // Tooltip Logic
