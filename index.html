@@ -710,7 +710,13 @@
                     </div>
                     <button onclick="nextMonth()">Next →</button>
                 </div>
-                <button class="add-event-btn" onclick="openEventModal()">+ Add Event</button>
+                <!-- Filter Section -->
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="filterNameInput" placeholder="Filter by Name..."
+                        oninput="currentNameFilter=this.value; renderCalendar();"
+                        style="padding:6px; border-radius:4px; border:1px solid #ccc; width:150px;" />
+                    <button class="add-event-btn" onclick="openEventModal()">+ Add Event</button>
+                </div>
             </div>
             <div
                 style="padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: #f8f9fa; border-bottom: 1px solid #ddd;">
@@ -949,6 +955,7 @@
         let eventCategories = {};
         let taskCategories = {};
         let currentEventFilter = 'all'; // New filter state
+        let currentNameFilter = ''; // Name filter state
 
         // Draft variables for List Editing
         let currentListId = null;
@@ -1180,6 +1187,7 @@
             all.forEach(e => {
                 // FILTER CHECK FOR PRINT
                 if (currentEventFilter !== 'all' && e.category !== currentEventFilter) return;
+                if (currentNameFilter && !(e.title.toLowerCase().includes(currentNameFilter.toLowerCase()) || (e.description && e.description.toLowerCase().includes(currentNameFilter.toLowerCase())))) return;
 
                 const div = document.createElement('div');
                 div.className = 'print-event';
@@ -1367,6 +1375,8 @@
                         gt.innerHTML = hoverHTML;
                         gt.style.visibility = 'visible';
                         gt.style.opacity = '1';
+                        // Force z-index higher than any modal
+                        gt.style.zIndex = '2147483647';
                     }
                 };
                 d.onmousemove = (ev) => {
@@ -1542,7 +1552,6 @@
 
             }, 1000);
         }
-
 
 
         function getRepEvents(dk) {
@@ -1837,6 +1846,7 @@
             all.forEach(e => {
                 // FILTER CHECK
                 if (currentEventFilter !== 'all' && e.category !== currentEventFilter) return;
+                if (currentNameFilter && !(e.title.toLowerCase().includes(currentNameFilter.toLowerCase()) || (e.description && e.description.toLowerCase().includes(currentNameFilter.toLowerCase())))) return;
 
                 const el = document.createElement('div');
                 el.className = 'event-item' + (e.isRepeating ? ' repeating' : '');
