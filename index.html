@@ -475,7 +475,8 @@
     <div class="login-container" id="loginContainer">
         <h1>🔒 Calendar Login</h1>
         <div id="errorMessage" class="error-message"></div>
-        <input type="password" id="passwordInput" placeholder="Enter your password" />
+        <input type="password" id="passwordInput" placeholder="Enter your password"
+            onkeyup="if(event.key==='Enter')login()" />
         <button onclick="login()">Login</button>
         <p style="margin-top: 20px; font-size: 12px; color: #999; text-align: center;">First time? Set your password</p>
     </div>
@@ -599,6 +600,7 @@
         const REPEAT = [{ value: 'none', label: 'No Repeat' }, { value: 'daily', label: 'Every Day' }, { value: 'weekly', label: 'Every Week' }, { value: 'biweekly', label: 'Every 2 Weeks' }, { value: 'monthly', label: 'Every Month' }, { value: 'yearly', label: 'Every Year' }];
 
         function hash(p) { let h = 0; for (let i = 0; i < p.length; i++) { h = ((h << 5) - h) + p.charCodeAt(i); h &= h; } return h.toString(); }
+        function formatTime(t) { if (!t) return ''; let [h, m] = t.split(':'); h = parseInt(h); const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12; h = h ? h : 12; return `${h}:${m} ${ampm}`; }
         function login() { const p = document.getElementById('passwordInput').value, e = document.getElementById('errorMessage'); if (!p) { e.textContent = 'Enter password'; return; } const h = hash(p), s = localStorage.getItem('cal_pw'); if (!s) { localStorage.setItem('cal_pw', h); init(); } else if (s === h) { init(); } else { e.textContent = 'Wrong password'; } }
         function logout() { document.getElementById('loginContainer').style.display = 'block'; document.getElementById('mainContainer').style.display = 'none'; document.getElementById('passwordInput').value = ''; }
         function init() { document.getElementById('loginContainer').style.display = 'none'; document.getElementById('mainContainer').style.display = 'block'; load(); renderCalendar(); renderTasks(); }
@@ -611,7 +613,7 @@
 
         function renderCalendar() { const y = currentDate.getFullYear(), m = currentDate.getMonth(); document.getElementById('currentMonth').textContent = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }); const first = new Date(y, m, 1), last = new Date(y, m + 1, 0), prev = new Date(y, m, 0), start = first.getDay(), total = last.getDate(), grid = document.getElementById('calendarGrid'); grid.innerHTML = '';['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => { const h = document.createElement('div'); h.className = 'day-header'; h.textContent = d; grid.appendChild(h); }); for (let i = start - 1; i >= 0; i--) { grid.appendChild(createDay(prev.getDate() - i, y, m - 1, true)); } for (let d = 1; d <= total; d++) { grid.appendChild(createDay(d, y, m, false)); } const rem = 42 - (start + total); for (let d = 1; d <= rem; d++) { grid.appendChild(createDay(d, y, m + 1, true)); } }
 
-        function createDay(day, y, m, other) { const cell = document.createElement('div'); cell.className = 'day-cell' + (other ? ' other-month' : ''); const num = document.createElement('div'); num.className = 'day-number'; num.textContent = day; cell.appendChild(num); const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const all = [...(events[dk] || []), ...getRepEvents(dk)]; all.forEach(e => { const el = document.createElement('div'); el.className = 'event-item' + (e.isRepeating ? ' repeating' : ''); el.style.backgroundColor = eventCategories[e.category]?.color || '#999'; const ic = e.icon || eventCategories[e.category]?.icon || ''; if (ic) { const sp = document.createElement('span'); sp.textContent = ic; el.appendChild(sp); } const txt = document.createElement('span'); txt.textContent = e.time ? `${e.time} ${e.title}` : e.title; el.appendChild(txt); el.onclick = ev => { ev.stopPropagation(); openEventModal(e.id, dk, e.isRepeating); }; cell.appendChild(el); }); if (!other) cell.onclick = () => openEventModal(null, dk); return cell; }
+        function createDay(day, y, m, other) { const cell = document.createElement('div'); cell.className = 'day-cell' + (other ? ' other-month' : ''); const num = document.createElement('div'); num.className = 'day-number'; num.textContent = day; cell.appendChild(num); const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const all = [...(events[dk] || []), ...getRepEvents(dk)]; all.forEach(e => { const el = document.createElement('div'); el.className = 'event-item' + (e.isRepeating ? ' repeating' : ''); el.style.backgroundColor = eventCategories[e.category]?.color || '#999'; const ic = e.icon || eventCategories[e.category]?.icon || ''; if (ic) { const sp = document.createElement('span'); sp.textContent = ic; el.appendChild(sp); } const txt = document.createElement('span'); txt.textContent = e.time ? `${formatTime(e.time)} ${e.title}` : e.title; el.appendChild(txt); el.onclick = ev => { ev.stopPropagation(); openEventModal(e.id, dk, e.isRepeating); }; cell.appendChild(el); }); if (!other) cell.onclick = () => openEventModal(null, dk); return cell; }
 
         function previousMonth() { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); }
         function nextMonth() { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); }
