@@ -822,50 +822,77 @@
         function applyListToCalendar(listId) {
             const list = eventLists.find(l => l.id === listId);
             if (!list) return;
-            if (!confirm(`Apply "${list.name}" to your calendar? This will add ${list.events.length} events.`)) return;
+            if (!confirm(`Apply "${list.name}" to your calendar?`)) return;
 
             let addCount = 0;
+            let skipCount = 0;
+
             list.events.forEach(e => {
-                let targetDate = e.startDate;
+                // Handle Duration (Multi-day events)
+                // Default to 1 day if not specified.
+                const duration = e.duration || 1;
 
-                // If it's a repeating event, add to repeatingEvents
-                if (e.repeat && e.repeat !== 'none') {
-                    const newRepEvent = {
-                        id: Date.now().toString() + Math.random().toString().substr(2, 5),
-                        title: e.title,
-                        time: e.time || '',
-                        description: e.description || '',
-                        category: Object.keys(eventCategories)[0],
-                        icon: e.icon || '',
-                        repeat: e.repeat,
-                        startDate: targetDate || new Date().toISOString().split('T')[0]
-                    };
-                    repeatingEvents.push(newRepEvent);
-                    addCount++;
-                } else {
-                    // One-time event
-                    if (!targetDate) {
-                        targetDate = new Date().toISOString().split('T')[0];
+                for (let d = 0; d < duration; d++) {
+                    // Calculate date for this iteration (StartDate + d days)
+                    let baseDate = new Date(e.startDate);
+                    baseDate.setDate(baseDate.getDate() + d + 1); // +1 because e.startDate "2025-08-25" parses to UTC midnight, often previous day in local if not careful, but splitting string is safer.
+
+                    // BETTER DATE PARSING TO AVOID TIMEZONE ISSUES
+                    let parts = e.startDate.split('-');
+                    let dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                    dateObj.setDate(dateObj.getDate() + d);
+
+                    let targetDateKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+
+                    // If it's a repeating event, we handle differently
+                    if (e.repeat && e.repeat !== 'none') {
+                        // Check duplicate in rep events (simplified check)
+                        const exists = repeatingEvents.some(re => re.title === e.title && re.startDate === e.startDate);
+                        if (!exists) {
+                            const newRepEvent = {
+                                id: Date.now().toString() + Math.random().toString().substr(2, 5),
+                                title: e.title,
+                                time: e.time || '',
+                                description: e.description || '',
+                                category: Object.keys(eventCategories)[0],
+                                icon: e.icon || '',
+                                repeat: e.repeat,
+                                startDate: e.startDate
+                            };
+                            repeatingEvents.push(newRepEvent);
+                            addCount++;
+                        } else {
+                            skipCount++;
+                        }
+                        // Break loop for repeating events (don't support duration on repeating yet)
+                        break;
+                    } else {
+                        // One-time event
+                        if (!events[targetDateKey]) events[targetDateKey] = [];
+
+                        // Check for duplicate on this specific day
+                        const exists = events[targetDateKey].some(ev => ev.title === e.title);
+                        if (!exists) {
+                            const newEvent = {
+                                id: Date.now().toString() + Math.random().toString().substr(2, 5),
+                                title: e.title + (duration > 1 ? ` (Day ${d + 1}/${duration})` : ''),
+                                time: e.time || '',
+                                description: e.description || '',
+                                category: Object.keys(eventCategories)[0],
+                                icon: e.icon || '',
+                                repeat: 'none'
+                            };
+                            events[targetDateKey].push(newEvent);
+                            addCount++;
+                        } else {
+                            skipCount++;
+                        }
                     }
-
-                    const newEvent = {
-                        id: Date.now().toString() + Math.random().toString().substr(2, 5),
-                        title: e.title,
-                        time: e.time || '',
-                        description: e.description || '',
-                        category: Object.keys(eventCategories)[0],
-                        icon: e.icon || '',
-                        repeat: 'none'
-                    };
-
-                    if (!events[targetDate]) events[targetDate] = [];
-                    events[targetDate].push(newEvent);
-                    addCount++;
                 }
             });
             save();
             renderCalendar();
-            alert(`Successfully added ${addCount} events to your calendar!`);
+            alert(`Added ${addCount} events. (Skipped ${skipCount} duplicates). \n\nCheck specific months (like Jan/Mar 2026) to see them!`);
             closeListsModal();
         }
 
@@ -978,9 +1005,11 @@
                         desc: 'Current Year: Includes Spring 2026 dates',
                         events: [
                             { title: 'First Day of School', startDate: '2025-08-25', repeat: 'none', icon: '🏫' },
-                            { title: 'Winter Break', startDate: '2025-12-20', repeat: 'none', icon: '❄️' },
-                            { title: 'MLK Day (No School)', startDate: '2026-01-19', repeat: 'none', icon: '✊' },
-                            { title: 'Spring Break', startDate: '2026-03-30', repeat: 'none', icon: '🌱' },
+                            { title: 'Winter Break', startDate: '2025-12-22', duration: 12, repeat: 'none', icon: '❄️' },
+                            { title: 'Martin Luther King Jr. Day', startDate: '2026-01-19', repeat: 'none', icon: '✊' },
+                            { title: 'Teacher Workday', startDate: '2026-02-20', repeat: 'none', icon: '👩‍🏫' },
+                            { title: 'Spring Break', startDate: '2026-03-30', duration: 5, repeat: 'none', icon: '🌱' },
+                            { title: 'Memorial Day', startDate: '2026-05-25', repeat: 'none', icon: '🇺🇸' },
                             { title: 'Last Day of School', startDate: '2026-06-12', repeat: 'none', icon: '🎉' }
                         ]
                     });
@@ -993,7 +1022,7 @@
                             { title: 'First Day of School', startDate: '2026-08-24', repeat: 'none', icon: '🏫' },
                             { title: 'Labor Day (No School)', startDate: '2026-09-07', repeat: 'none', icon: '🚫' },
                             { title: 'Teacher Workday', startDate: '2026-10-30', repeat: 'none', icon: '👩‍🏫' },
-                            { title: 'Winter Break', startDate: '2026-12-21', repeat: 'none', icon: '❄️' },
+                            { title: 'Winter Break', startDate: '2026-12-21', duration: 10, repeat: 'none', icon: '❄️' },
                         ]
                     });
                 }
