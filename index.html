@@ -866,12 +866,21 @@
                     <input type="date" id="listEventDate" title="Specific Date (Optional)" />
                     <input type="time" id="listEventTime" />
                 </div>
-                <div class="form-group"><select id="listEventRepeat">
-                        <option value="none">One Time</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                    </select></div>
+                <div class="form-group" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="font-size:11px; color:#555;">Repeat</label>
+                        <select id="listEventRepeat" style="width:100%;">
+                            <option value="none">One Time</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px; color:#555;">End Date (Optional)</label>
+                        <input type="date" id="listEventEndDate" style="width:100%;" />
+                    </div>
+                </div>
                 <button class="save-btn" onclick="addEventToListDraft()" style="width:100%; padding:8px;">+ Add to
                     List</button>
             </div>
@@ -1188,7 +1197,8 @@
                                 category: Object.keys(eventCategories)[0],
                                 icon: e.icon || '',
                                 repeat: e.repeat,
-                                startDate: e.startDate
+                                startDate: e.startDate,
+                                endDate: e.endDate || null // Pass End Date
                             };
                             repeatingEvents.push(newRepEvent);
                             addCount++;
@@ -1256,23 +1266,29 @@
         }
 
         function addEventToListDraft() {
-            const title = document.getElementById('listEventTitle').value;
-            const date = document.getElementById('listEventDate').value; // Optional
-            const time = document.getElementById('listEventTime').value;
-            const repeat = document.getElementById('listEventRepeat').value;
+            const t = document.getElementById('listEventTitle').value;
+            const d = document.getElementById('listEventDate').value; // Optional
+            const tm = document.getElementById('listEventTime').value;
+            const r = document.getElementById('listEventRepeat').value;
+            const ed = document.getElementById('listEventEndDate').value; // Optional
 
-            if (!title) return alert("Title required");
+            if (!t) return alert("Title required");
 
             draftListEvents.push({
-                title,
-                startDate: date, // Can be empty
-                time,
-                repeat,
-                id: Date.now()
+                title: t,
+                startDate: d, // empty string if not set, handled in apply
+                time: tm,
+                repeat: r,
+                endDate: ed
             });
 
-            // value clear
+            // reset inputs
             document.getElementById('listEventTitle').value = '';
+            document.getElementById('listEventTime').value = '';
+            document.getElementById('listEventDate').value = '';
+            document.getElementById('listEventEndDate').value = '';
+            document.getElementById('listEventRepeat').value = 'none';
+
             renderDraftEvents();
         }
 
@@ -1412,6 +1428,13 @@
             repeatingEvents.forEach(e => {
                 const ed = new Date(e.startDate);
                 if (d < ed) return;
+
+                // End Date Check
+                if (e.endDate) {
+                    const stopDate = new Date(e.endDate);
+                    if (d > stopDate) return;
+                }
+
                 let show = false;
                 switch (e.repeat) {
                     case 'daily':
