@@ -935,6 +935,8 @@
         </div>
     </div>
 
+    <div id="globalTooltip" class="event-tooltip"
+        style="position:fixed; z-index:99999; pointer-events:none; transition:opacity 0.1s;"></div>
     <script>
 
         let currentDate = new Date();
@@ -1343,11 +1345,24 @@
                     if (e.time) hoverText += ` at ${formatTime(e.time)}`;
                 }
 
-                // create tooltip
-                const tt = document.createElement('div');
-                tt.className = 'event-tooltip';
-                tt.textContent = hoverText;
-                d.appendChild(tt);
+                // Tooltip Logic using Global Fixed Tooltip to avoid overflow clipping
+                d.onmouseenter = () => {
+                    const gt = document.getElementById('globalTooltip');
+                    gt.textContent = hoverText;
+                    gt.style.visibility = 'visible';
+                    gt.style.opacity = '1';
+                };
+                d.onmousemove = (ev) => {
+                    const gt = document.getElementById('globalTooltip');
+                    // Position 15px down and right of cursor
+                    gt.style.left = (ev.clientX + 15) + 'px';
+                    gt.style.top = (ev.clientY + 15) + 'px';
+                };
+                d.onmouseleave = () => {
+                    const gt = document.getElementById('globalTooltip');
+                    gt.style.visibility = 'hidden';
+                    gt.style.opacity = '0';
+                };
 
                 d.onclick = () => {
                     // EDIT MODE: Populate fields
