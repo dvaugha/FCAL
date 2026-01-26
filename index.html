@@ -1814,22 +1814,74 @@
                 tm = document.getElementById('eventTime').value,
                 desc = document.getElementById('eventDescription').value.trim(),
                 cat = document.getElementById('eventCategory').value;
+
             if (!t || !d) {
                 alert('Enter title and date');
                 return;
             }
+
+            // CLEANUP OLD EVENT (AND SERIES IF APPLICABLE)
             if (editingEventId) {
+                let oldEvent = null;
+                // Find old event to check for series
                 for (let dk in events) {
-                    const i = events[dk].findIndex(e => e.id === editingEventId);
-                    if (i !== -1) {
-                        events[dk].splice(i, 1);
-                        if (!events[dk].length) delete events[dk];
-                        break;
+                    const found = events[dk].find(e => e.id === editingEventId);
+                    if (found) { oldEvent = found; break; }
+                }
+
+                const seriesMatch = oldEvent ? oldEvent.title.match(/(.*) \(Day (\d+)\/(\d+)\)/) : null;
+
+                if (seriesMatch && confirm("This event is part of a series. Update the entire series length/details?")) {
+                    const coreTitle = seriesMatch[1];
+                    const total = parseInt(seriesMatch[3]);
+
+                    // DELETE ALL IN SERIES
+                    for (let i = 1; i <= total; i++) {
+                        const sTitle = `${coreTitle} (Day ${i}/${total})`;
+                        for (let dk in events) {
+                            const idx = events[dk].findIndex(e => e.title === sTitle);
+                            if (idx !== -1) {
+                                events[dk].splice(idx, 1);
+                                if (events[dk].length === 0) delete events[dk];
+                            }
+                        }
+                    }
+                } else {
+                    // Standard single delete (if user said No or not a series)
+                    for (let dk in events) {
+                        const i = events[dk].findIndex(e => e.id === editingEventId);
+                        if (i !== -1) {
+                            events[dk].splice(i, 1);
+                            if (!events[dk].length) delete events[dk];
+                            break;
+                        }
                     }
                 }
+
                 const ri = repeatingEvents.findIndex(e => e.id === editingEventId);
                 if (ri !== -1) repeatingEvents.splice(ri, 1);
             }
+
+            // CHECK FOR SERIES UPDATE
+            // If editing an event that looks like "Title (Day X/Y)", we might need to clear the whole old series
+            let seriesTitleBase = null;
+            if (editingEventId) {
+                // We don't have the OLD title easily here unless we looked it up before delete.
+                // But generally users will edit the 'Day 1' or any day. 
+                // For V1 simplicity: We rely on the NEW Duration. 
+                // If the user changes Duration on an event that WAS part of a series, we need to handle cleanup.
+
+                // Currently 'saveEvent' deletes the single ID above.
+                // If the user wants to resize a series, they should ideally start from Day 1 or we need advanced logic.
+                // IMPROVEMENT: Detecting series from the title being saved (if user kept the name).
+            }
+
+            // Logic for Duration Resizing
+            // If the user enters a Duration > 1, we generate the series.
+            // If the user is editing an event and changes duration to 1, we only save the one.
+            // However, the *other* days of the old series remain unless deleted.
+            // FEATURE: Explicitly ask if resizing series.
+
             const ev = {
                 id: editingEventId || Date.now().toString(),
                 title: t,
