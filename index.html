@@ -696,6 +696,7 @@
                     <button class="header-btn" onclick="openCategoriesModal('event')">⚙️ Categories</button>
                     <button class="header-btn" onclick="openListsModal()">📋 Lists & Smart Add</button>
                     <button class="header-btn" onclick="openPrintModal()">🖨️ Print</button>
+                    <button class="header-btn" onclick="openDataModal()">💾 Data</button>
                     <button class="header-btn" onclick="logout()">Logout</button>
                 </div>
             </div>
@@ -941,6 +942,36 @@
         </div>
     </div>
 
+    <!-- Data Options Modal -->
+    <div class="modal" id="dataModal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h2>💾 Data Backup & Restore</h2>
+            <p style="margin-bottom: 20px; color:#555;">Save your calendar data to a file or load from a backup.</p>
+
+            <div
+                style="margin-bottom:20px; padding:15px; border:1px solid #eee; border-radius:6px; background:#f9f9f9;">
+                <h3 style="margin-bottom:10px;">📤 Export</h3>
+                <p style="font-size:12px; margin-bottom:10px;">Save all events, tasks, and settings to a file.</p>
+                <button class="save-btn" onclick="exportData()" style="width:100%;">Download Backup File</button>
+            </div>
+
+            <div
+                style="margin-bottom:20px; padding:15px; border:1px solid #eee; border-radius:6px; background:#f9f9f9;">
+                <h3 style="margin-bottom:10px;">📥 Import</h3>
+                <p style="font-size:12px; margin-bottom:10px;">Restore from a backup file (Overwrites current data!).
+                </p>
+                <input type="file" id="importFileInput" accept=".json" style="display:none"
+                    onchange="importData(this)" />
+                <button class="save-btn" onclick="triggerImport()" style="width:100%; background:#e67e22;">Select File
+                    to Restore</button>
+            </div>
+
+            <div class="button-group">
+                <button class="cancel-btn" onclick="closeDataModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="globalTooltip"
         style="position:fixed; z-index:2147483647; pointer-events:none; display:none; opacity:0; top:0; left:0; background:rgba(20, 20, 20, 0.95); color:white; padding:8px 12px; border-radius:6px; font-size:12px; max-width:300px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">
     </div>
@@ -1102,6 +1133,80 @@
                 `;
                 container.appendChild(start);
             });
+        }
+
+        // --- Data Logic ---
+        function openDataModal() {
+            document.getElementById('dataModal').style.display = 'flex';
+        }
+        function closeDataModal() {
+            document.getElementById('dataModal').style.display = 'none';
+        }
+
+        function exportData() {
+            const data = {
+                version: 1,
+                date: new Date().toISOString(),
+                events: events,
+                repeatingEvents: repeatingEvents,
+                tasks: tasks,
+                repeatingTasks: repeatingTasks,
+                eventLists: eventLists,
+                eventCategories: eventCategories,
+                taskCategories: taskCategories
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "fcal_backup_" + new Date().toISOString().slice(0, 10) + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function triggerImport() {
+            document.getElementById('importFileInput').click();
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (!confirm("WARNING: This will overwrite ALL current calendar data with the data from the file. Are you sure?")) {
+                input.value = ''; // reset
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+
+                    // Basic validation
+                    if (!data.events && !data.repeatingEvents) throw new Error("Invalid format");
+
+                    // Restore vars
+                    events = data.events || {};
+                    repeatingEvents = data.repeatingEvents || [];
+                    tasks = data.tasks || [];
+                    repeatingTasks = data.repeatingTasks || [];
+                    eventLists = data.eventLists || [];
+
+                    // Restore categories if present (merge or overwrite? Overwrite for restore)
+                    if (data.eventCategories) eventCategories = data.eventCategories;
+                    if (data.taskCategories) taskCategories = data.taskCategories;
+
+                    save(); // Save to local storage
+                    renderCalendar();
+                    renderTasks();
+                    closeDataModal();
+                    alert("Data restored successfully!");
+                } catch (err) {
+                    alert("Error importing file: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // reset for next time
         }
 
         // --- Print Logic ---
